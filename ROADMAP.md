@@ -96,7 +96,7 @@ playwright.config.ts      固定 viewport / deviceScaleFactor=1 / webServer 自�
 
 | 里程碑 | 状态 | E2E |
 | --- | --- | --- |
-| M0 脚手架与画布 | ⬜ 未开始 | e2e/m0.spec.ts |
+| M0 脚手架与画布 | ✅ 已完成 | e2e/m0.spec.ts |
 | M1 基础绘制与历史 | ⬜ 未开始 | e2e/m1.spec.ts |
 | M2 形状、填充与取色 | ⬜ 未开始 | e2e/m2.spec.ts |
 | M3 选区与剪贴板 | ⬜ 未开始 | e2e/m3.spec.ts |
