@@ -25,6 +25,7 @@ const MENUS: MenuDef[] = [
     ],
   },
   { label: '查看', items: ['view.zoomIn', 'view.zoomOut', 'view.fit'] },
+  { label: '图像', items: ['image.crop'] },
   { label: '帮助', items: ['help.about'] },
 ];
 
@@ -64,6 +65,7 @@ export class UIManager {
   private readonly editor: Editor;
   private readonly statusCoords: HTMLElement;
   private readonly statusSize: HTMLElement;
+  private readonly statusSelection: HTMLElement;
   private readonly statusZoom: HTMLElement;
   private readonly statusTool: HTMLElement;
   private readonly menuRoot: HTMLElement;
@@ -176,11 +178,19 @@ export class UIManager {
     this.statusCoords.dataset.testid = 'status-coords';
     this.statusSize = el('span', 'status-item', '');
     this.statusSize.dataset.testid = 'status-size';
+    this.statusSelection = el('span', 'status-item', '—');
+    this.statusSelection.dataset.testid = 'status-selection';
     this.statusZoom = el('span', 'status-item', '100%');
     this.statusZoom.dataset.testid = 'status-zoom';
     this.statusTool = el('span', 'status-item', '—');
     this.statusTool.dataset.testid = 'status-tool';
-    status.append(this.statusCoords, this.statusSize, this.statusZoom, this.statusTool);
+    status.append(
+      this.statusCoords,
+      this.statusSize,
+      this.statusSelection,
+      this.statusZoom,
+      this.statusTool,
+    );
 
     app.append(menu, body, colorBar, status);
     root.append(app);
@@ -214,6 +224,7 @@ export class UIManager {
     editor.events.on('colors:change', () => this.syncColors());
     editor.events.on('selection:change', () => {
       this.refreshMenuStates();
+      this.updateSelection();
       const id = this.editor.tools.activeToolId;
       if (id === 'select' || id === 'crop') this.renderProperties();
     });
@@ -601,19 +612,34 @@ export class UIManager {
   private renderHistory(): void {
     const body = this.historyBody;
     body.replaceChildren();
-    const entries = this.editor.history.entries;
-    if (entries.length === 0) {
+    const applied = this.editor.history.entries;
+    const pending = this.editor.history.redoEntries;
+    if (applied.length === 0 && pending.length === 0) {
       body.append(el('div', 'history-empty', '暂无记录'));
       return;
     }
-    entries.forEach((entry, index) => {
-      const item = el('button', 'history-item', `${index + 1}. ${entry.name}`);
+    let index = 0;
+    for (const entry of applied) {
+      index += 1;
+      const target = index;
+      const item = el('button', 'history-item', `${target}. ${entry.name}`);
       item.type = 'button';
       item.dataset.testid = 'history-item';
       item.title = '点击回到此步之后的状态';
-      item.addEventListener('click', () => this.editor.history.jumpTo(index + 1));
+      item.addEventListener('click', () => this.editor.history.jumpTo(target));
       body.append(item);
-    });
+    }
+    for (const entry of pending) {
+      index += 1;
+      const target = index;
+      const item = el('button', 'history-item history-item-redo', `${target}. ${entry.name}`);
+      item.type = 'button';
+      item.dataset.testid = 'history-item-redo';
+      item.classList.add('is-undone');
+      item.title = '点击重做到此步';
+      item.addEventListener('click', () => this.editor.history.jumpTo(target));
+      body.append(item);
+    }
   }
 
   private updateActiveTool(id: string): void {
@@ -642,5 +668,12 @@ export class UIManager {
 
   updateTool(label: string): void {
     this.statusTool.textContent = label;
+  }
+
+  updateSelection(): void {
+    const rect = this.editor.selection.shape;
+    this.statusSelection.textContent = rect
+      ? `选区 ${Math.round(rect.width)} × ${Math.round(rect.height)}`
+      : '—';
   }
 }

@@ -23,6 +23,11 @@ export class HistoryManager {
     return this.undoStack;
   }
 
+  /** 待重做的条目（时间顺序：下一次重做排最前），用于历史面板前跳。 */
+  get redoEntries(): readonly HistoryEntry[] {
+    return [...this.redoStack].reverse();
+  }
+
   /** 已应用的条目数，jumpTo 的目标值域为 [0, entries.length]。 */
   get appliedCount(): number {
     return this.undoStack.length;

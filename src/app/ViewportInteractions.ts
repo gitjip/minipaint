@@ -42,10 +42,15 @@ export class ViewportInteractions {
 
   /** 粘贴事件（右键粘贴 / 合成事件）：选区缓冲优先，否则按打开路径导入。 */
   private onPaste = (event: ClipboardEvent): void => {
+    if (isEditableTarget(event.target)) return;
     const file = event.clipboardData?.files?.[0];
-    if (!file) return;
     event.preventDefault();
-    void this.editor.selection.pasteExternalFile(file);
+    if (file) {
+      void this.editor.selection.pasteExternalFile(file);
+      return;
+    }
+    // 无文件（纯文本/系统剪贴板无图）：只粘贴内部选区缓冲，不触发系统剪贴板读取权限。
+    this.editor.selection.pasteBuffer();
   };
 
   private localPoint(clientX: number, clientY: number): { x: number; y: number } {

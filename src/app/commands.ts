@@ -23,6 +23,14 @@ export const TOOL_ORDER = [
   'ellipse',
 ] as const;
 
+async function runExportPng(editor: Editor): Promise<void> {
+  try {
+    await exportPng(editor.document);
+  } catch (error) {
+    window.alert(`导出失败: ${String(error)}`);
+  }
+}
+
 export const commandList: Command[] = [
   {
     id: 'file.new',
@@ -36,17 +44,16 @@ export const commandList: Command[] = [
     shortcuts: ['Mod+O'],
     run: (editor) => editor.ui.pickFile(),
   },
-  { id: 'file.save', label: '保存', shortcuts: ['Mod+S'] },
+  {
+    id: 'file.save',
+    label: '保存',
+    shortcuts: ['Mod+S'],
+    run: (editor) => runExportPng(editor),
+  },
   {
     id: 'file.exportPng',
     label: '导出 PNG…',
-    run: async (editor) => {
-      try {
-        await exportPng(editor.document);
-      } catch (error) {
-        window.alert(`导出失败: ${String(error)}`);
-      }
-    },
+    run: (editor) => runExportPng(editor),
   },
   {
     id: 'file.exportJpeg',
@@ -146,6 +153,14 @@ export const commandList: Command[] = [
     label: '适应窗口',
     shortcuts: ['Mod+0'],
     run: (editor) => editor.fitToWindow(),
+  },
+  {
+    id: 'image.crop',
+    label: '裁剪到选区',
+    enabled: (editor) => editor.selection.hasSelection,
+    run: (editor) => {
+      editor.cropSelection();
+    },
   },
   { id: 'help.about', label: '关于 MiniPaint', run: (editor) => editor.showAbout() },
   {

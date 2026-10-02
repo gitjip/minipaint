@@ -100,9 +100,9 @@ test.describe('M1 · 基础绘制与历史', () => {
     await expect(page.getByTestId('status-tool')).toHaveText('铅笔');
     await expect(page.getByTestId('tool-pencil')).toHaveClass(/is-active/);
 
-    // 未实现的命令保持禁用（保存尚无后端语义）
+    // 文件保存已接通（= 导出 PNG 下载，本地方案无后端）
     await page.getByRole('button', { name: '文件' }).click();
-    await expect(page.getByTestId('menu-file.save')).toBeDisabled();
+    await expect(page.getByTestId('menu-file.save')).toBeEnabled();
     await page.keyboard.press('Escape');
 
     expect(errors).toEqual([]);

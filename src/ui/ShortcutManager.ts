@@ -20,6 +20,10 @@ export class ShortcutManager {
     for (const command of this.registry.list()) {
       for (const shortcut of command.shortcuts ?? []) {
         if (!eventMatchesShortcut(event, shortcut)) continue;
+        // Ctrl+V 交由浏览器原生 paste 事件处理（携带剪贴板文件）：
+        // 在此执行命令并 preventDefault 会挡掉 paste 事件，
+        // 而 navigator.clipboard.read 常因权限被拒，导致无法粘贴系统图片。
+        if (command.id === 'edit.paste') return;
         if (!this.registry.execute(command.id, this.editor)) return;
         event.preventDefault();
         return;

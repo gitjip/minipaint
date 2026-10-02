@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { docHash, docPixel, gotoApp, stroke, waitForRender } from './helpers/canvas';
+import { docHash, docPixel, gotoApp, selectionState, stroke, waitForRender } from './helpers/canvas';
 
 const WHITE = [255, 255, 255, 255];
 const RED = [255, 0, 0, 255];
@@ -136,8 +136,9 @@ test.describe('M4 · 文本与文件', () => {
     expect(errors).toEqual([]);
   });
 
-  test('粘贴图片：paste 事件携带文件时按打开路径导入', async ({ page }) => {
+  test('粘贴图片：paste 事件携带文件 → 浮离而非替换文档', async ({ page }) => {
     const errors = await gotoApp(page);
+    const before = await docHash(page);
 
     await page.evaluate((base64) => {
       const binary = atob(base64);
@@ -151,9 +152,18 @@ test.describe('M4 · 文本与文件', () => {
       );
     }, FIXTURE_BASE64);
 
-    await expect(page.getByTestId('status-size')).toHaveText('6 × 4');
-    expect(await docPixel(page, 0, 0)).toEqual(RED);
-    expect(await docPixel(page, 5, 0)).toEqual(BLUE);
+    await expect.poll(async () => (await selectionState(page)).float !== null).toBe(true);
+    const float = (await selectionState(page)).float!;
+    expect(float.width).toBe(6);
+    expect(float.height).toBe(4);
+    await expect(page.getByTestId('status-size')).toHaveText('800 × 600');
+    expect(await docHash(page)).toBe(before);
+
+    await page.keyboard.press('Enter');
+    await waitForRender(page);
+    await expect(page.getByTestId('history-item')).toHaveCount(1);
+    expect(await docPixel(page, float.x, float.y)).toEqual(RED);
+    expect(await docPixel(page, float.x + 3, float.y)).toEqual(BLUE);
 
     expect(errors).toEqual([]);
   });

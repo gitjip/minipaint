@@ -7,6 +7,7 @@ import {
   type Patch,
   type Rect,
 } from './patches';
+import { assertImportSize, decodeImage } from './FileManager';
 import { pointInPolygon, polygonBounds, translatePoints, type PointLike } from './selectionPath';
 
 export interface FloatState {
@@ -337,26 +338,34 @@ export class SelectionManager {
     return this.deleteSelection('剪切');
   }
 
-  /** 优先系统剪贴板（Clipboard API），失败/超时降级到内部缓冲；两者皆无且为外部图片时按打开路径导入。 */
+  /** 只粘贴内部选区缓冲（无则无操作）：不读取系统剪贴板，避免触发权限提示。 */
+  pasteBuffer(): void {
+    this.commitFloat();
+    if (this.internal) this.createPasteFloat(this.internal);
+  }
+
+  /** 系统剪贴板有图 → 浮离该图；否则降级浮离内部缓冲。粘贴从不替换文档。 */
   async pasteClipboard(): Promise<void> {
     this.commitFloat();
     const system = await this.readSystemClipboard();
     if (system) {
-      if (this.internal) this.createPasteFloat(system);
-      else await this.editor.importImage(system);
+      this.createPasteFloat(system);
       return;
     }
     if (this.internal) this.createPasteFloat(this.internal);
   }
 
-  /** 粘贴事件带来的文件：有选区缓冲则浮离缓冲，否则导入为新文档。 */
+  /** 粘贴事件带来的文件：解码为浮离选区（不替换文档），失败给出提示。 */
   async pasteExternalFile(file: Blob): Promise<void> {
     this.commitFloat();
-    if (this.internal) {
-      this.createPasteFloat(this.internal);
-      return;
+    try {
+      const source = await decodeImage(file);
+      assertImportSize(source.width, source.height);
+      this.createPasteFloat(source);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.editor.ui.notify(`粘贴失败：${message}`);
     }
-    await this.editor.importImage(file);
   }
 
   private async readSystemClipboard(): Promise<HTMLCanvasElement | null> {
