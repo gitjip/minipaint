@@ -1,9 +1,14 @@
 import { CommandRegistry, commandList } from './commands';
 import { EventBus } from './EventBus';
 import { ViewportInteractions } from './ViewportInteractions';
+import { ColorManager } from '../core/ColorManager';
 import { Document } from '../core/Document';
+import { HistoryManager } from '../core/HistoryManager';
 import { Viewport } from '../core/Viewport';
 import { Renderer } from '../render/Renderer';
+import { EraserTool } from '../tools/EraserTool';
+import { PencilTool } from '../tools/PencilTool';
+import { ToolManager } from '../tools/ToolManager';
 import { ShortcutManager } from '../ui/ShortcutManager';
 import { UIManager } from '../ui/UIManager';
 
@@ -11,7 +16,14 @@ export type EditorEvents = {
   'viewport:change': { scale: number; offsetX: number; offsetY: number };
   'document:change': { document: Document };
   'command:executed': { id: string };
+  'tool:change': { id: string; label: string };
+  'colors:change': Record<string, never>;
+  'history:change': Record<string, never>;
 };
+
+export interface ToolOptions {
+  eraserSize: number;
+}
 
 export const DEFAULT_DOC_WIDTH = 800;
 export const DEFAULT_DOC_HEIGHT = 600;
@@ -20,9 +32,13 @@ export class Editor {
   readonly events = new EventBus<EditorEvents>();
   readonly viewport = new Viewport();
   readonly registry = new CommandRegistry();
+  readonly history = new HistoryManager(100);
+  readonly colors = new ColorManager();
+  readonly options: ToolOptions = { eraserSize: 8 };
   document: Document;
   readonly ui: UIManager;
   readonly renderer: Renderer;
+  readonly tools: ToolManager;
   private readonly interactions: ViewportInteractions;
   private readonly shortcuts: ShortcutManager;
 
@@ -38,18 +54,30 @@ export class Editor {
       viewport: this.viewport,
       getDocument: () => this.document,
     });
+    this.renderer.setPreviewPainter((ctx) => this.tools.drawPreview(ctx));
+
+    this.tools = new ToolManager(this);
+    this.tools.register(new PencilTool(this));
+    this.tools.register(new EraserTool(this));
+
     this.interactions = new ViewportInteractions(this.ui.view, this);
     this.shortcuts = new ShortcutManager(this.registry, this);
 
+    this.history.subscribe(() => {
+      this.events.emit('history:change', {});
+      this.renderer.requestRender();
+    });
+    this.colors.subscribe(() => this.events.emit('colors:change', {}));
+
     this.ui.updateSize();
     this.ui.updateZoom();
-    this.ui.updateTool('—');
     this.interactions.attach();
     this.shortcuts.attach();
 
     window.addEventListener('resize', () => this.renderer.resize());
     this.renderer.resize();
     this.resetView();
+    this.tools.select('pencil');
   }
 
   private resetView(): void {
@@ -85,6 +113,10 @@ export class Editor {
     this.events.emit('viewport:change', this.viewport.state);
   }
 
+  selectTool(id: string): boolean {
+    return this.tools.select(id);
+  }
+
   newDocument(width: number, height: number, background?: string): void {
     this.replaceDocument(new Document(width, height, background));
     this.resetView();
@@ -92,6 +124,7 @@ export class Editor {
 
   replaceDocument(doc: Document): void {
     this.document = doc;
+    this.history.clear();
     this.ui.updateSize();
     this.renderer.requestRender();
     this.events.emit('document:change', { document: doc });

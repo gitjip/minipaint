@@ -57,6 +57,38 @@ export async function docPixel(page: Page, x: number, y: number): Promise<number
   }, [x, y] as [number, number]);
 }
 
+/** 文档坐标 → 页面绝对坐标（用于鼠标交互）。 */
+export async function canvasToScreen(
+  page: Page,
+  x: number,
+  y: number,
+): Promise<{ x: number; y: number }> {
+  return page.evaluate(
+    ([cx, cy]) => {
+      const editor = (window as unknown as { minipaint: Editor }).minipaint;
+      const point = editor.viewport.canvasToScreen(cx, cy);
+      const rect = editor.ui.view.getBoundingClientRect();
+      return { x: rect.left + point.x, y: rect.top + point.y };
+    },
+    [x, y] as [number, number],
+  );
+}
+
+/** 按文档坐标依次按下/拖拽/抬起，模拟一笔。 */
+export async function stroke(
+  page: Page,
+  points: { x: number; y: number }[],
+): Promise<void> {
+  const first = await canvasToScreen(page, points[0].x, points[0].y);
+  await page.mouse.move(first.x, first.y);
+  await page.mouse.down();
+  for (const point of points.slice(1)) {
+    const target = await canvasToScreen(page, point.x, point.y);
+    await page.mouse.move(target.x, target.y, { steps: 8 });
+  }
+  await page.mouse.up();
+}
+
 /** 等待两帧 rAF，确保 Renderer 已完成绘制。 */
 export async function waitForRender(page: Page): Promise<void> {
   await page.evaluate(

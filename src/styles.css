@@ -33,7 +33,7 @@ button {
 
 .app {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr auto auto;
   height: 100%;
 }
 
@@ -141,6 +141,11 @@ button {
   background: var(--hover);
 }
 
+.tool-button.is-active {
+  background: #e8f0fe;
+  border-color: var(--accent);
+}
+
 .tool-button:disabled {
   opacity: 0.4;
   cursor: default;
@@ -216,6 +221,135 @@ button {
   border-radius: 6px;
   color: var(--text-dim);
   text-align: center;
+}
+
+.size-options {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.size-button {
+  min-width: 34px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.size-button.is-active {
+  background: #e8f0fe;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.history-empty {
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.history-item {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-item:hover {
+  background: var(--hover);
+}
+
+.color-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 40px;
+  padding: 4px 12px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.color-pair {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.color-swatch {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  background: var(--c, #000);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.color-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.color-swap {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.color-swap:hover {
+  background: var(--hover);
+}
+
+.palette,
+.recent-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+}
+
+.palette-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.palette-swatch:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.recent-colors:empty {
+  display: none;
 }
 
 .status-bar {

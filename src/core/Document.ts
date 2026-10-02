@@ -1,8 +1,10 @@
+import type { PatchTarget, RawImageData, Rect } from './patches';
+
 export const MAX_DOC_SIZE = 8192;
 
 export type RGBA = [number, number, number, number];
 
-export class Document {
+export class Document implements PatchTarget {
   readonly width: number;
   readonly height: number;
   readonly canvas: HTMLCanvasElement;
@@ -31,5 +33,18 @@ export class Document {
     if (x < 0 || y < 0 || x >= this.width || y >= this.height) return null;
     const data = this.ctx.getImageData(x, y, 1, 1).data;
     return [data[0], data[1], data[2], data[3]];
+  }
+
+  readRect(rect: Rect): RawImageData {
+    if (rect.width <= 0 || rect.height <= 0) {
+      return { width: 0, height: 0, data: new Uint8ClampedArray(0) };
+    }
+    return this.ctx.getImageData(rect.x, rect.y, rect.width, rect.height);
+  }
+
+  writeRect(rect: Rect, image: RawImageData): void {
+    if (rect.width <= 0 || rect.height <= 0) return;
+    if (image.width <= 0 || image.height <= 0) return;
+    this.ctx.putImageData(new ImageData(image.data, image.width, image.height), rect.x, rect.y);
   }
 }

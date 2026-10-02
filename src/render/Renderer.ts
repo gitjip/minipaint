@@ -19,6 +19,7 @@ export class Renderer {
   private readonly getDocument: () => Document;
   private rafId = 0;
   private dpr = 1;
+  private previewPainter: ((ctx: CanvasRenderingContext2D) => void) | null = null;
 
   constructor(options: RendererOptions) {
     this.view = options.view;
@@ -27,6 +28,10 @@ export class Renderer {
     this.overlayLayer = options.overlayLayer;
     this.viewport = options.viewport;
     this.getDocument = options.getDocument;
+  }
+
+  setPreviewPainter(painter: (ctx: CanvasRenderingContext2D) => void): void {
+    this.previewPainter = painter;
   }
 
   resize(): void {
@@ -104,6 +109,14 @@ export class Renderer {
 
     this.clearLayer(this.previewLayer);
     this.clearLayer(this.overlayLayer);
+
+    const previewCtx = this.previewLayer.getContext('2d');
+    if (previewCtx && this.previewPainter) {
+      previewCtx.save();
+      previewCtx.setTransform(scale * dpr, 0, 0, scale * dpr, offsetX * dpr, offsetY * dpr);
+      this.previewPainter(previewCtx);
+      previewCtx.restore();
+    }
   }
 
   private clearLayer(canvas: HTMLCanvasElement): void {

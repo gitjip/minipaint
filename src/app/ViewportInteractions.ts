@@ -20,6 +20,7 @@ export class ViewportInteractions {
     this.view.addEventListener('pointerdown', this.onPointerDown);
     this.view.addEventListener('pointermove', this.onPointerMove);
     this.view.addEventListener('pointerleave', this.onPointerLeave);
+    this.view.addEventListener('contextmenu', (event) => event.preventDefault());
     window.addEventListener('pointermove', this.onWindowPointerMove);
     window.addEventListener('pointerup', this.onWindowPointerUp);
     window.addEventListener('pointercancel', this.onWindowPointerUp);
@@ -28,23 +29,33 @@ export class ViewportInteractions {
     window.addEventListener('blur', this.reset);
   }
 
+  private localPoint(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.view.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
   private onWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    const rect = this.view.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const { x, y } = this.localPoint(event.clientX, event.clientY);
     const factor = Math.pow(ZOOM_BASE, -event.deltaY);
     this.editor.zoomAt(x, y, factor);
   };
 
   private onPointerDown = (event: PointerEvent): void => {
     const wantPan = this.spaceHeld || event.button === 1;
-    if (!wantPan) return;
+    if (wantPan) {
+      event.preventDefault();
+      this.panning = true;
+      this.lastX = event.clientX;
+      this.lastY = event.clientY;
+      this.view.classList.add('is-panning');
+      return;
+    }
+    if (event.button !== 0) return;
     event.preventDefault();
-    this.panning = true;
-    this.lastX = event.clientX;
-    this.lastY = event.clientY;
-    this.view.classList.add('is-panning');
+    const { x, y } = this.localPoint(event.clientX, event.clientY);
+    const point = this.editor.viewport.screenToCanvas(x, y);
+    this.editor.tools.pointerDown(point, event);
   };
 
   private onPointerMove = (event: PointerEvent): void => {
@@ -52,29 +63,47 @@ export class ViewportInteractions {
       this.pan(event.clientX, event.clientY);
       return;
     }
+    if (this.editor.tools.isStrokeActive) {
+      const { x, y } = this.localPoint(event.clientX, event.clientY);
+      const point = this.editor.viewport.screenToCanvas(x, y);
+      this.editor.tools.pointerMove(point, event);
+      return;
+    }
+    const { x, y } = this.localPoint(event.clientX, event.clientY);
     const rect = this.view.getBoundingClientRect();
-    const localX = event.clientX - rect.left;
-    const localY = event.clientY - rect.top;
-    if (localX < 0 || localY < 0 || localX > rect.width || localY > rect.height) {
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
       this.editor.setHover(null);
       return;
     }
-    const point = this.editor.viewport.screenToCanvas(localX, localY);
-    this.editor.setHover(point);
+    this.editor.setHover(this.editor.viewport.screenToCanvas(x, y));
   };
 
   private onPointerLeave = (): void => {
-    if (!this.panning) this.editor.setHover(null);
+    if (!this.panning && !this.editor.tools.isStrokeActive) this.editor.setHover(null);
   };
 
   private onWindowPointerMove = (event: PointerEvent): void => {
-    if (this.panning) this.pan(event.clientX, event.clientY);
+    if (this.panning) {
+      this.pan(event.clientX, event.clientY);
+      return;
+    }
+    if (this.editor.tools.isStrokeActive) {
+      const { x, y } = this.localPoint(event.clientX, event.clientY);
+      const point = this.editor.viewport.screenToCanvas(x, y);
+      this.editor.tools.pointerMove(point, event);
+    }
   };
 
-  private onWindowPointerUp = (): void => {
-    if (!this.panning) return;
-    this.panning = false;
-    this.view.classList.remove('is-panning');
+  private onWindowPointerUp = (event: PointerEvent): void => {
+    if (this.panning) {
+      this.panning = false;
+      this.view.classList.remove('is-panning');
+    }
+    if (this.editor.tools.isStrokeActive) {
+      const { x, y } = this.localPoint(event.clientX, event.clientY);
+      const point = this.editor.viewport.screenToCanvas(x, y);
+      this.editor.tools.pointerUp(point, event);
+    }
   };
 
   private pan(clientX: number, clientY: number): void {
@@ -88,9 +117,16 @@ export class ViewportInteractions {
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      this.editor.tools.cancel();
+      return;
+    }
     if (event.code !== 'Space' || event.repeat) return;
     const target = event.target;
-    if (target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+    if (
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+    ) {
       return;
     }
     event.preventDefault();
