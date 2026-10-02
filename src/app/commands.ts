@@ -162,6 +162,12 @@ export const commandList: Command[] = [
       editor.cropSelection();
     },
   },
+  {
+    id: 'image.resize',
+    label: '画布尺寸…',
+    shortcuts: ['Mod+E'],
+    run: (editor) => editor.ui.showCanvasSizeDialog(),
+  },
   { id: 'help.about', label: '关于 MiniPaint', run: (editor) => editor.showAbout() },
   {
     id: 'tool.select',

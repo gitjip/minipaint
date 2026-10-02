@@ -203,10 +203,12 @@ export class Editor {
     }
   }
 
-  replaceDocument(doc: Document): void {
+  replaceDocument(doc: Document, options: { clearHistory?: boolean } = {}): void {
     this.document = doc;
     this.selection.handleDocumentReplaced();
-    this.history.clear();
+    if (options.clearHistory !== false) {
+      this.history.clear();
+    }
     this.ui.updateSize();
     this.renderer.requestRender();
     this.events.emit('document:change', { document: doc });
@@ -230,6 +232,29 @@ export class Editor {
   /** 裁剪到当前选区（裁剪工具 Enter / 点击框内确认）。 */
   cropSelection(): boolean {
     return this.cropTo(this.selection.shape);
+  }
+
+  /** 调整画布尺寸：内容对齐左上角，扩大区域填充背景色，缩小裁掉超出部分；整幅交换入历史（可撤销/重做）。 */
+  resizeCanvas(width: number, height: number): void {
+    const prev = this.document;
+    if (width === prev.width && height === prev.height) return;
+    const next = new Document(width, height);
+    next.ctx.fillStyle = this.colors.background;
+    next.ctx.fillRect(0, 0, width, height);
+    next.ctx.drawImage(prev.canvas, 0, 0);
+    this.replaceDocument(next, { clearHistory: false });
+    this.resetView();
+    this.history.push({
+      name: '画布尺寸',
+      undo: () => {
+        this.replaceDocument(prev, { clearHistory: false });
+        this.resetView();
+      },
+      redo: () => {
+        this.replaceDocument(next, { clearHistory: false });
+        this.resetView();
+      },
+    });
   }
 
   setHover(point: { x: number; y: number } | null): void {

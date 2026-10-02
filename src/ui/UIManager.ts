@@ -25,7 +25,7 @@ const MENUS: MenuDef[] = [
     ],
   },
   { label: '查看', items: ['view.zoomIn', 'view.zoomOut', 'view.fit'] },
-  { label: '图像', items: ['image.crop'] },
+  { label: '图像', items: ['image.crop', 'image.resize'] },
   { label: '帮助', items: ['help.about'] },
 ];
 
@@ -82,6 +82,7 @@ export class UIManager {
   private openMenu: HTMLElement | null = null;
   private toast: HTMLElement | null = null;
   private draftPrompt: HTMLElement | null = null;
+  private canvasSizeDialog: HTMLElement | null = null;
 
   constructor(root: HTMLElement, editor: Editor) {
     this.editor = editor;
@@ -290,6 +291,75 @@ export class UIManager {
   hideDraftPrompt(): void {
     this.draftPrompt?.remove();
     this.draftPrompt = null;
+  }
+
+  /** 画布尺寸对话框（图像 → 画布尺寸… / Ctrl+E）。 */
+  showCanvasSizeDialog(): void {
+    this.hideCanvasSizeDialog();
+    const doc = this.editor.document;
+    const wrap = el('div', 'modal-backdrop');
+    wrap.dataset.testid = 'canvas-size-dialog';
+    const dialog = el('div', 'modal-dialog');
+    dialog.append(el('div', 'modal-title', '画布尺寸'));
+    dialog.append(
+      el(
+        'div',
+        'modal-text',
+        '内容对齐左上角：扩大区域填充背景色，缩小则裁掉超出部分。范围 1–8192。',
+      ),
+    );
+
+    const fields = el('div', 'dialog-fields');
+    const makeField = (label: string, value: number, testid: string): HTMLInputElement => {
+      const field = el('label', 'dialog-field');
+      field.append(el('span', 'dialog-field-label', label));
+      const input = el('input', 'dialog-field-input');
+      input.type = 'number';
+      input.min = '1';
+      input.max = '8192';
+      input.step = '1';
+      input.value = String(value);
+      input.dataset.testid = testid;
+      field.append(input);
+      fields.append(field);
+      return input;
+    };
+    const widthInput = makeField('宽度（像素）', doc.width, 'canvas-width');
+    const heightInput = makeField('高度（像素）', doc.height, 'canvas-height');
+    dialog.append(fields);
+
+    const actions = el('div', 'modal-actions');
+    const ok = el('button', 'modal-button primary', '确定');
+    ok.type = 'button';
+    ok.dataset.testid = 'canvas-size-ok';
+    ok.addEventListener('click', () => {
+      const width = Number(widthInput.value);
+      const height = Number(heightInput.value);
+      const valid = (value: number): boolean => Number.isInteger(value) && value >= 1 && value <= 8192;
+      if (!valid(width) || !valid(height)) {
+        this.notify('画布尺寸需为 1–8192 之间的整数');
+        return;
+      }
+      this.hideCanvasSizeDialog();
+      this.editor.resizeCanvas(width, height);
+    });
+    const cancel = el('button', 'modal-button', '取消');
+    cancel.type = 'button';
+    cancel.dataset.testid = 'canvas-size-cancel';
+    cancel.addEventListener('click', () => this.hideCanvasSizeDialog());
+    actions.append(ok, cancel);
+    dialog.append(actions);
+
+    wrap.append(dialog);
+    this.appRoot.append(wrap);
+    this.canvasSizeDialog = wrap;
+    widthInput.focus();
+    widthInput.select();
+  }
+
+  hideCanvasSizeDialog(): void {
+    this.canvasSizeDialog?.remove();
+    this.canvasSizeDialog = null;
   }
 
   private buildMenu(def: MenuDef): HTMLElement {
