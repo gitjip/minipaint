@@ -100,7 +100,7 @@ playwright.config.ts      固定 viewport / deviceScaleFactor=1 / webServer 自�
 | M1 基础绘制与历史 | ✅ 已完成 | e2e/m1.spec.ts |
 | M2 形状、填充与取色 | ✅ 已完成 | e2e/m2.spec.ts |
 | M3 选区与剪贴板 | ✅ 已完成 | e2e/m3.spec.ts |
-| M4 文本与文件 | ⬜ 未开始 | e2e/m4.spec.ts |
+| M4 文本与文件 | ✅ 已完成 | e2e/m4.spec.ts |
 | M5 打磨与完备 | ⬜ 未开始 | e2e/m5.spec.ts |
 | M6 可选扩展 | ⏸ 暂缓 | — |
 
@@ -165,22 +165,23 @@ E2E 验收（e2e/m3.spec.ts）：
 
 ### M4 · 文本与文件（2–3 次会话）
 任务：
-- [ ] 文本工具：DOM 覆盖输入框，回车 / 失焦栅格化
-- [ ] 字体、字号、颜色属性
-- [ ] 打开：文件选择、拖拽导入、粘贴图片；PNG / JPEG / WebP，GIF 取首帧
-- [ ] 导出：PNG、JPEG（质量）、WebP
-- [ ] 草稿：IndexedDB 防抖 2s 自动保存 + 启动恢复提示
+- [x] 文本工具：DOM 覆盖输入框，回车 / 失焦栅格化
+- [x] 字体、字号、颜色属性
+- [x] 打开：文件选择、拖拽导入、粘贴图片；PNG / JPEG / WebP，GIF 取首帧
+- [x] 导出：PNG、JPEG（质量 0.92）、WebP
+- [x] 草稿：IndexedDB 防抖 2s 自动保存 + 启动恢复提示
 
 E2E 验收（e2e/m4.spec.ts）：
-- [ ] `setInputFiles` 打开 fixture PNG，文档尺寸更新且内容像素匹配
-- [ ] 粘贴图片、拖拽导入路径可用
-- [ ] 编辑后 reload → 恢复提示出现 → 选择恢复后像素一致；选择丢弃则回到原始状态
-- [ ] 损坏文件给出错误提示且当前文档不受影响
-- [ ] 导出 JPEG / WebP 下载成功
+- [x] `setInputFiles` 打开 fixture PNG，文档尺寸更新且内容像素匹配
+- [x] 粘贴图片、拖拽导入路径可用
+- [x] 编辑后 reload → 恢复提示出现 → 选择恢复后像素一致；选择丢弃则回到原始状态
+- [x] 损坏文件给出错误提示且当前文档不受影响
+- [x] 导出 JPEG / WebP 下载成功
 
 ### M5 · 打磨与完备（2–3 次会话）
 任务：
 - [ ] 快捷键矩阵全量接通，文本框聚焦时屏蔽工具键
+- [ ] 修复 `Ctrl+V` 粘贴系统图片（快捷键 preventDefault 挡掉原生 paste 事件，改走 `clipboardData.files` 或放开默认行为；`navigator.clipboard.read` 需权限）
 - [ ] 菜单：文件 / 编辑 / 查看 / 图像，与快捷键共用命令表
 - [ ] 右侧面板：工具属性 + 历史列表（可点击跳转）
 - [ ] 状态栏：坐标、选区尺寸、缩放、当前工具、文档尺寸

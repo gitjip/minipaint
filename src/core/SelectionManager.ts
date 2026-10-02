@@ -337,12 +337,26 @@ export class SelectionManager {
     return this.deleteSelection('剪切');
   }
 
-  /** 优先系统剪贴板（Clipboard API），失败/超时降级到内部缓冲。 */
+  /** 优先系统剪贴板（Clipboard API），失败/超时降级到内部缓冲；两者皆无且为外部图片时按打开路径导入。 */
   async pasteClipboard(): Promise<void> {
     this.commitFloat();
-    const source = (await this.readSystemClipboard()) ?? this.internal;
-    if (!source) return;
-    this.createPasteFloat(source);
+    const system = await this.readSystemClipboard();
+    if (system) {
+      if (this.internal) this.createPasteFloat(system);
+      else await this.editor.importImage(system);
+      return;
+    }
+    if (this.internal) this.createPasteFloat(this.internal);
+  }
+
+  /** 粘贴事件带来的文件：有选区缓冲则浮离缓冲，否则导入为新文档。 */
+  async pasteExternalFile(file: Blob): Promise<void> {
+    this.commitFloat();
+    if (this.internal) {
+      this.createPasteFloat(this.internal);
+      return;
+    }
+    await this.editor.importImage(file);
   }
 
   private async readSystemClipboard(): Promise<HTMLCanvasElement | null> {

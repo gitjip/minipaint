@@ -22,6 +22,9 @@ export class ViewportInteractions {
     this.view.addEventListener('pointermove', this.onPointerMove);
     this.view.addEventListener('pointerleave', this.onPointerLeave);
     this.view.addEventListener('contextmenu', (event) => event.preventDefault());
+    this.view.addEventListener('dragover', (event) => event.preventDefault());
+    this.view.addEventListener('drop', this.onDrop);
+    document.addEventListener('paste', this.onPaste);
     window.addEventListener('pointermove', this.onWindowPointerMove);
     window.addEventListener('pointerup', this.onWindowPointerUp);
     window.addEventListener('pointercancel', this.onWindowPointerUp);
@@ -29,6 +32,21 @@ export class ViewportInteractions {
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', this.reset);
   }
+
+  /** 拖拽图片到画布 → 导入替换文档。 */
+  private onDrop = (event: DragEvent): void => {
+    event.preventDefault();
+    const file = event.dataTransfer?.files?.[0];
+    if (file) void this.editor.importImage(file);
+  };
+
+  /** 粘贴事件（右键粘贴 / 合成事件）：选区缓冲优先，否则按打开路径导入。 */
+  private onPaste = (event: ClipboardEvent): void => {
+    const file = event.clipboardData?.files?.[0];
+    if (!file) return;
+    event.preventDefault();
+    void this.editor.selection.pasteExternalFile(file);
+  };
 
   private localPoint(clientX: number, clientY: number): { x: number; y: number } {
     const rect = this.view.getBoundingClientRect();
@@ -43,6 +61,8 @@ export class ViewportInteractions {
   };
 
   private onPointerDown = (event: PointerEvent): void => {
+    const target = event.target as HTMLElement | null;
+    if (target?.tagName === 'TEXTAREA') return; // 文本输入框内点击交给其自身
     const wantPan = this.spaceHeld || event.button === 1;
     if (wantPan) {
       event.preventDefault();

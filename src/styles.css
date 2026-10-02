@@ -387,3 +387,87 @@ button {
   min-width: 72px;
   font-variant-numeric: tabular-nums;
 }
+
+.text-overlay {
+  position: absolute;
+  z-index: 5;
+  min-width: 160px;
+  padding: 2px 4px;
+  border: 1px dashed var(--accent);
+  background: rgba(255, 255, 255, 0.85);
+  outline: none;
+  resize: both;
+  overflow: hidden;
+  white-space: pre;
+}
+
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  z-index: 50;
+  transform: translateX(-50%);
+  max-width: 70vw;
+  padding: 10px 16px;
+  border-radius: 6px;
+  background: #323232;
+  color: #fff;
+  box-shadow: var(--menu-shadow);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(32, 33, 36, 0.45);
+}
+
+.modal-dialog {
+  min-width: 300px;
+  padding: 18px 20px;
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--menu-shadow);
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.modal-text {
+  color: var(--text-dim);
+  margin-bottom: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modal-button {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.modal-button:hover {
+  background: var(--hover);
+}
+
+.modal-button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.modal-button.primary:hover {
+  filter: brightness(1.08);
+}

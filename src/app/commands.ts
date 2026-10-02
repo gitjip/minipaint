@@ -1,5 +1,5 @@
 import type { Editor } from './Editor';
-import { exportPng } from '../core/FileManager';
+import { exportImage, exportPng, JPEG_QUALITY, WEBP_QUALITY } from '../core/FileManager';
 
 export interface Command {
   id: string;
@@ -24,8 +24,18 @@ export const TOOL_ORDER = [
 ] as const;
 
 export const commandList: Command[] = [
-  { id: 'file.new', label: '新建…', shortcuts: ['Mod+N'] },
-  { id: 'file.open', label: '打开…', shortcuts: ['Mod+O'] },
+  {
+    id: 'file.new',
+    label: '新建…',
+    shortcuts: ['Mod+N'],
+    run: (editor) => editor.newDocument(),
+  },
+  {
+    id: 'file.open',
+    label: '打开…',
+    shortcuts: ['Mod+O'],
+    run: (editor) => editor.ui.pickFile(),
+  },
   { id: 'file.save', label: '保存', shortcuts: ['Mod+S'] },
   {
     id: 'file.exportPng',
@@ -33,6 +43,28 @@ export const commandList: Command[] = [
     run: async (editor) => {
       try {
         await exportPng(editor.document);
+      } catch (error) {
+        window.alert(`导出失败: ${String(error)}`);
+      }
+    },
+  },
+  {
+    id: 'file.exportJpeg',
+    label: '导出 JPEG…',
+    run: async (editor) => {
+      try {
+        await exportImage(editor.document, 'image/jpeg', 'jpg', JPEG_QUALITY);
+      } catch (error) {
+        window.alert(`导出失败: ${String(error)}`);
+      }
+    },
+  },
+  {
+    id: 'file.exportWebp',
+    label: '导出 WebP…',
+    run: async (editor) => {
+      try {
+        await exportImage(editor.document, 'image/webp', 'webp', WEBP_QUALITY);
       } catch (error) {
         window.alert(`导出失败: ${String(error)}`);
       }
@@ -153,7 +185,12 @@ export const commandList: Command[] = [
     shortcuts: ['I'],
     run: (editor) => editor.selectTool('eyedropper'),
   },
-  { id: 'tool.text', label: '文本', shortcuts: ['T'] },
+  {
+    id: 'tool.text',
+    label: '文本',
+    shortcuts: ['T'],
+    run: (editor) => editor.selectTool('text'),
+  },
   {
     id: 'tool.line',
     label: '直线',

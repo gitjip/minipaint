@@ -3,6 +3,13 @@ import { EventBus } from './EventBus';
 import { ViewportInteractions } from './ViewportInteractions';
 import { ColorManager, rgbToHex } from '../core/ColorManager';
 import { Document } from '../core/Document';
+import {
+  clearDraft,
+  draftMatches,
+  loadDraft,
+  saveDraft,
+} from '../core/DraftStore';
+import { assertImportSize, decodeImage } from '../core/FileManager';
 import { HistoryManager } from '../core/HistoryManager';
 import { SelectionManager } from '../core/SelectionManager';
 import { clampRect, type Rect } from '../core/patches';
@@ -16,6 +23,7 @@ import { EyedropperTool } from '../tools/EyedropperTool';
 import { PencilTool } from '../tools/PencilTool';
 import { EllipseTool, LineTool, RectTool } from '../tools/ShapeTools';
 import { SelectTool } from '../tools/SelectTool';
+import { TextTool } from '../tools/TextTool';
 import { ToolManager } from '../tools/ToolManager';
 import { ShortcutManager } from '../ui/ShortcutManager';
 import { UIManager } from '../ui/UIManager';
@@ -38,6 +46,8 @@ export interface ToolOptions {
   shapeStrokeWidth: number;
   fillTolerance: number;
   selectionMode: 'rect' | 'lasso';
+  fontFamily: string;
+  fontSize: number;
 }
 
 export const DEFAULT_DOC_WIDTH = 800;
@@ -50,6 +60,7 @@ export class Editor {
   readonly history = new HistoryManager(100);
   readonly colors = new ColorManager();
   readonly selection = new SelectionManager(this);
+  readonly textTool = new TextTool(this);
   readonly options: ToolOptions = {
     eraserSize: 8,
     brushSize: 8,
@@ -58,6 +69,8 @@ export class Editor {
     shapeStrokeWidth: 2,
     fillTolerance: 0,
     selectionMode: 'rect',
+    fontFamily: 'sans-serif',
+    fontSize: 24,
   };
   document: Document;
   readonly ui: UIManager;
@@ -65,6 +78,7 @@ export class Editor {
   readonly tools: ToolManager;
   private readonly interactions: ViewportInteractions;
   private readonly shortcuts: ShortcutManager;
+  private draftTimer: number | null = null;
 
   constructor(root: HTMLElement) {
     this.document = new Document(DEFAULT_DOC_WIDTH, DEFAULT_DOC_HEIGHT);
@@ -84,6 +98,7 @@ export class Editor {
     this.tools = new ToolManager(this);
     this.tools.register(new SelectTool(this));
     this.tools.register(new CropTool(this));
+    this.tools.register(this.textTool);
     this.tools.register(new PencilTool(this));
     this.tools.register(new BrushTool(this));
     this.tools.register(new EraserTool(this));
@@ -99,6 +114,7 @@ export class Editor {
     this.history.subscribe(() => {
       this.events.emit('history:change', {});
       this.renderer.requestRender();
+      this.scheduleDraftSave();
     });
     this.colors.subscribe(() => this.events.emit('colors:change', {}));
 
@@ -111,6 +127,7 @@ export class Editor {
     this.renderer.resize();
     this.resetView();
     this.tools.select('pencil');
+    void this.initDraft();
   }
 
   private resetView(): void {
@@ -160,9 +177,30 @@ export class Editor {
     return true;
   }
 
-  newDocument(width: number, height: number, background?: string): void {
+  newDocument(
+    width: number = DEFAULT_DOC_WIDTH,
+    height: number = DEFAULT_DOC_HEIGHT,
+    background?: string,
+  ): void {
     this.replaceDocument(new Document(width, height, background));
     this.resetView();
+  }
+
+  /** 导入图片替换文档（打开/拖拽/粘贴共用）；失败弹出提示且不动当前文档。 */
+  async importImage(source: Blob | HTMLCanvasElement): Promise<boolean> {
+    try {
+      const image = source instanceof HTMLCanvasElement ? source : await decodeImage(source);
+      assertImportSize(image.width, image.height);
+      const next = new Document(image.width, image.height);
+      next.ctx.drawImage(image, 0, 0);
+      this.replaceDocument(next);
+      this.resetView();
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.ui.notify(`打开失败：${message}`);
+      return false;
+    }
   }
 
   replaceDocument(doc: Document): void {
@@ -202,5 +240,53 @@ export class Editor {
     window.alert(
       `MiniPaint 0.1.0\n本地运行的网页画图工具\n画布上限 8192×8192`,
     );
+  }
+
+  /** 草稿防抖：最后一次编辑 2s 后写入 IndexedDB。 */
+  private scheduleDraftSave(): void {
+    if (this.draftTimer !== null) window.clearTimeout(this.draftTimer);
+    this.draftTimer = window.setTimeout(() => {
+      this.draftTimer = null;
+      void this.persistDraft();
+    }, 2000);
+  }
+
+  private async persistDraft(): Promise<void> {
+    const doc = this.document;
+    try {
+      await saveDraft({
+        width: doc.width,
+        height: doc.height,
+        pixels: doc.ctx.getImageData(0, 0, doc.width, doc.height),
+        savedAt: Date.now(),
+      });
+    } catch {
+      /* IndexedDB 不可用时静默 */
+    }
+  }
+
+  /** 启动时读草稿：与当前（默认）文档一致则静默清理，否则弹恢复提示。 */
+  private async initDraft(): Promise<void> {
+    const draft = await loadDraft();
+    if (!draft) return;
+    const doc = this.document;
+    const current = doc.ctx.getImageData(0, 0, doc.width, doc.height);
+    if (draftMatches(draft, doc.width, doc.height, current)) {
+      await clearDraft();
+      return;
+    }
+    this.ui.showDraftPrompt(draft.savedAt, {
+      restore: async () => {
+        this.ui.hideDraftPrompt();
+        const next = new Document(draft.width, draft.height);
+        next.ctx.putImageData(draft.pixels, 0, 0);
+        this.replaceDocument(next);
+        this.resetView();
+      },
+      discard: async () => {
+        this.ui.hideDraftPrompt();
+        await clearDraft();
+      },
+    });
   }
 }

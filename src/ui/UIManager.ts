@@ -8,7 +8,10 @@ interface MenuDef {
 }
 
 const MENUS: MenuDef[] = [
-  { label: '文件', items: ['file.new', 'file.open', 'file.save', 'file.exportPng'] },
+  {
+    label: '文件',
+    items: ['file.new', 'file.open', 'file.save', 'file.exportPng', 'file.exportJpeg', 'file.exportWebp'],
+  },
   {
     label: '编辑',
     items: [
@@ -29,6 +32,12 @@ const ERASER_SIZES = [4, 8, 16, 32];
 const BRUSH_SIZES = [2, 4, 8, 16, 32];
 const BRUSH_OPACITIES = [100, 75, 50, 25];
 const LINE_WIDTHS = [1, 2, 4, 8];
+const FONT_FAMILIES = [
+  { value: 'sans-serif', label: '无衬线' },
+  { value: 'serif', label: '衬线' },
+  { value: 'monospace', label: '等宽' },
+];
+const FONT_SIZES = [12, 16, 24, 36, 48];
 const SHAPE_MODES: { value: string; label: string }[] = [
   { value: 'stroke', label: '描边' },
   { value: 'fill', label: '填充' },
@@ -66,13 +75,18 @@ export class UIManager {
   private readonly fgInput: HTMLInputElement;
   private readonly bgInput: HTMLInputElement;
   private readonly recentRow: HTMLElement;
+  private readonly appRoot: HTMLElement;
+  private readonly fileInput: HTMLInputElement;
   private openMenu: HTMLElement | null = null;
+  private toast: HTMLElement | null = null;
+  private draftPrompt: HTMLElement | null = null;
 
   constructor(root: HTMLElement, editor: Editor) {
     this.editor = editor;
     root.replaceChildren();
 
     const app = el('div', 'app');
+    this.appRoot = app;
 
     const menu = el('header', 'app-menu');
     this.menuRoot = menu;
@@ -171,6 +185,18 @@ export class UIManager {
     app.append(menu, body, colorBar, status);
     root.append(app);
 
+    this.fileInput = el('input', 'file-input');
+    this.fileInput.type = 'file';
+    this.fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif,image/bmp';
+    this.fileInput.dataset.testid = 'file-input';
+    this.fileInput.hidden = true;
+    this.fileInput.addEventListener('change', () => {
+      const file = this.fileInput.files?.[0];
+      this.fileInput.value = '';
+      if (file) void this.editor.importImage(file);
+    });
+    app.append(this.fileInput);
+
     this.buildPalette(palette);
 
     document.addEventListener('pointerdown', (event) => {
@@ -199,6 +225,60 @@ export class UIManager {
     this.renderProperties();
     this.renderHistory();
     this.syncColors();
+  }
+
+  /** 触发系统文件选择（文件 → 打开）。 */
+  pickFile(): void {
+    this.fileInput.click();
+  }
+
+  /** 轻量错误/信息提示条（不阻塞文档）。 */
+  notify(message: string): void {
+    this.toast?.remove();
+    const toast = el('div', 'app-toast', message);
+    toast.dataset.testid = 'toast';
+    this.appRoot.append(toast);
+    this.toast = toast;
+    window.setTimeout(() => {
+      if (this.toast === toast) {
+        toast.remove();
+        this.toast = null;
+      }
+    }, 4000);
+  }
+
+  showDraftPrompt(
+    savedAt: number,
+    handlers: { restore: () => void | Promise<void>; discard: () => void | Promise<void> },
+  ): void {
+    this.hideDraftPrompt();
+    const time = new Date(savedAt);
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    const saved = `${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}`;
+    const wrap = el('div', 'modal-backdrop');
+    wrap.dataset.testid = 'draft-prompt';
+    const dialog = el('div', 'modal-dialog');
+    dialog.append(el('div', 'modal-title', '发现自动保存的草稿'));
+    dialog.append(el('div', 'modal-text', `草稿保存于 ${saved}，是否恢复到当前画布？`));
+    const actions = el('div', 'modal-actions');
+    const restore = el('button', 'modal-button primary', '恢复');
+    restore.type = 'button';
+    restore.dataset.testid = 'draft-restore';
+    restore.addEventListener('click', () => void handlers.restore());
+    const discard = el('button', 'modal-button', '丢弃');
+    discard.type = 'button';
+    discard.dataset.testid = 'draft-discard';
+    discard.addEventListener('click', () => void handlers.discard());
+    actions.append(restore, discard);
+    dialog.append(actions);
+    wrap.append(dialog);
+    this.appRoot.append(wrap);
+    this.draftPrompt = wrap;
+  }
+
+  hideDraftPrompt(): void {
+    this.draftPrompt?.remove();
+    this.draftPrompt = null;
   }
 
   private buildMenu(def: MenuDef): HTMLElement {
@@ -353,6 +433,7 @@ export class UIManager {
 
   private optionChanged(): void {
     this.editor.renderer.requestRender();
+    this.editor.textTool.syncStyle();
   }
 
   private renderProperties(): void {
@@ -457,6 +538,26 @@ export class UIManager {
       case 'crop':
         body.append(label('拖拽框选 → Enter / 点击框内应用 · Esc 取消'));
         return;
+      case 'text': {
+        body.append(label('字体'));
+        body.append(
+          this.optionRow(FONT_FAMILIES, options.fontFamily, 'font-family', (value) => {
+            options.fontFamily = value;
+            this.renderProperties();
+            this.optionChanged();
+          }),
+        );
+        body.append(label('字号'));
+        body.append(
+          this.numberRow(FONT_SIZES, options.fontSize, 'font-size', (value) => {
+            options.fontSize = value;
+            this.renderProperties();
+            this.optionChanged();
+          }),
+        );
+        body.append(label('颜色 = 前景色 · 回车落定 · Shift+Enter 换行 · Esc 取消'));
+        return;
+      }
       case 'line':
         body.append(label('线宽 · Shift 吸附 45°'));
         body.append(
