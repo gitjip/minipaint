@@ -1,6 +1,6 @@
 import type { Editor } from '../app/Editor';
-import { createPatchEntry } from '../core/patches';
-import { polylineToPixels, pixelRect, unionRects, type Point } from './geometry';
+import { createPatchEntry, clampRect, type Rect } from '../core/patches';
+import { polylineToPixels, type Point } from './geometry';
 
 export interface Tool {
   readonly id: string;
@@ -13,20 +13,34 @@ export interface Tool {
   drawPreview(ctx: CanvasRenderingContext2D): void;
 }
 
+/** 无状态工具的空实现基类。 */
+export abstract class BaseTool implements Tool {
+  abstract readonly id: string;
+  abstract readonly label: string;
+
+  onPointerDown(_point: Point, _event: PointerEvent): void {}
+  onPointerMove(_point: Point, _event: PointerEvent): void {}
+  onPointerUp(_point: Point, _event: PointerEvent): void {}
+  cancel(): void {}
+  drawPreview(_ctx: CanvasRenderingContext2D): void {}
+}
+
 /**
- * 自由绘制工具基类：拖拽期间在预览层按最终像素位置绘制，
+ * 自由绘制工具基类：拖拽期间在预览层按最终像素效果绘制，
  * 提交时围绕笔画包围盒截取前后补丁写入文档层并登记历史。
  */
-export abstract class StrokeTool implements Tool {
+export abstract class StrokeTool extends BaseTool {
   abstract readonly id: string;
   abstract readonly label: string;
 
   protected editor: Editor;
   protected strokePoints: Point[] | null = null;
-  private strokeSize = 1;
-  private strokeColor = '#000000';
+  protected strokeSize = 1;
+  protected strokeColor = '#000000';
+  protected strokeOpacity = 1;
 
   constructor(editor: Editor) {
+    super();
     this.editor = editor;
   }
 
@@ -34,12 +48,27 @@ export abstract class StrokeTool implements Tool {
   protected abstract getSize(): number;
   /** 笔画颜色（提交与预览一致）。 */
   protected abstract getColor(): string;
+  /** 不透明度 0–1，默认不透明。 */
+  protected getOpacity(): number {
+    return 1;
+  }
+
+  /** 把整条笔画绘制到给定上下文（预览层与文档层共用，保证一致）。 */
+  protected abstract paintShape(
+    ctx: CanvasRenderingContext2D,
+    pixels: readonly Point[],
+    points: readonly Point[],
+  ): void;
+
+  /** 笔画覆盖的保守包围盒，空则该笔不产生历史。 */
+  protected abstract bounds(pixels: readonly Point[]): Rect | null;
 
   onPointerDown(point: Point, _event: PointerEvent): void {
     if (this.strokePoints) return;
     this.strokePoints = [point];
     this.strokeSize = this.getSize();
     this.strokeColor = this.getColor();
+    this.strokeOpacity = this.getOpacity();
     this.editor.renderer.requestRender();
   }
 
@@ -67,36 +96,23 @@ export abstract class StrokeTool implements Tool {
   drawPreview(ctx: CanvasRenderingContext2D): void {
     if (!this.strokePoints) return;
     const pixels = polylineToPixels(this.strokePoints);
-    ctx.fillStyle = this.strokeColor;
-    for (const pixel of pixels) {
-      const rect = pixelRect(pixel.x, pixel.y, this.strokeSize);
-      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-    }
+    this.paintShape(ctx, pixels, this.strokePoints);
   }
 
-  private commit(points: readonly Point[]): void {
+  protected commit(points: readonly Point[]): void {
     const doc = this.editor.document;
     const pixels = polylineToPixels(points);
     if (pixels.length === 0) return;
-    const rects = pixels.map((pixel) => pixelRect(pixel.x, pixel.y, this.strokeSize));
-    const union = unionRects(rects);
-    if (!union || union.width <= 0 || union.height <= 0) return;
-    const clamped = {
-      x: Math.max(0, union.x),
-      y: Math.max(0, union.y),
-      width: Math.min(doc.width, union.x + union.width) - Math.max(0, union.x),
-      height: Math.min(doc.height, union.y + union.height) - Math.max(0, union.y),
-    };
-    if (clamped.width <= 0 || clamped.height <= 0) return;
+    const bounds = this.bounds(pixels);
+    if (!bounds) return;
+    const rect = clampRect(bounds, doc.width, doc.height);
+    if (rect.width <= 0 || rect.height <= 0) return;
 
-    const before = doc.readRect(clamped);
-    doc.ctx.fillStyle = this.strokeColor;
-    for (const rect of rects) {
-      doc.ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-    }
-    const after = doc.readRect(clamped);
-    this.editor.history.push(
-      createPatchEntry(doc, this.label, [{ rect: clamped, before, after }]),
-    );
+    const before = doc.readRect(rect);
+    doc.ctx.save();
+    this.paintShape(doc.ctx, pixels, points);
+    doc.ctx.restore();
+    const after = doc.readRect(rect);
+    this.editor.history.push(createPatchEntry(doc, this.label, [{ rect, before, after }]));
   }
 }

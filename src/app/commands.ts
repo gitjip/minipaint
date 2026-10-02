@@ -83,19 +83,49 @@ export const commandList: Command[] = [
     shortcuts: ['P'],
     run: (editor) => editor.selectTool('pencil'),
   },
-  { id: 'tool.brush', label: '画笔', shortcuts: ['B'] },
+  {
+    id: 'tool.brush',
+    label: '画笔',
+    shortcuts: ['B'],
+    run: (editor) => editor.selectTool('brush'),
+  },
   {
     id: 'tool.eraser',
     label: '橡皮',
     shortcuts: ['E'],
     run: (editor) => editor.selectTool('eraser'),
   },
-  { id: 'tool.bucket', label: '填充', shortcuts: ['G'] },
-  { id: 'tool.eyedropper', label: '取色', shortcuts: ['I'] },
+  {
+    id: 'tool.bucket',
+    label: '填充',
+    shortcuts: ['G'],
+    run: (editor) => editor.selectTool('bucket'),
+  },
+  {
+    id: 'tool.eyedropper',
+    label: '取色',
+    shortcuts: ['I'],
+    run: (editor) => editor.selectTool('eyedropper'),
+  },
   { id: 'tool.text', label: '文本', shortcuts: ['T'] },
-  { id: 'tool.line', label: '直线', shortcuts: ['L'] },
-  { id: 'tool.rect', label: '矩形', shortcuts: ['R'] },
-  { id: 'tool.ellipse', label: '椭圆', shortcuts: ['O'] },
+  {
+    id: 'tool.line',
+    label: '直线',
+    shortcuts: ['L'],
+    run: (editor) => editor.selectTool('line'),
+  },
+  {
+    id: 'tool.rect',
+    label: '矩形',
+    shortcuts: ['R'],
+    run: (editor) => editor.selectTool('rect'),
+  },
+  {
+    id: 'tool.ellipse',
+    label: '椭圆',
+    shortcuts: ['O'],
+    run: (editor) => editor.selectTool('ellipse'),
+  },
 ];
 
 export class CommandRegistry {

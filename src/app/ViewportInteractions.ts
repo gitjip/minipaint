@@ -55,6 +55,10 @@ export class ViewportInteractions {
     event.preventDefault();
     const { x, y } = this.localPoint(event.clientX, event.clientY);
     const point = this.editor.viewport.screenToCanvas(x, y);
+    if (event.altKey) {
+      this.editor.pickColorAt(point);
+      return;
+    }
     this.editor.tools.pointerDown(point, event);
   };
 

@@ -18,6 +18,21 @@ function normalize(color: string): string {
   throw new Error(`非法颜色值: ${color}`);
 }
 
+export function hexToRgba(hex: string): [number, number, number, number] {
+  const value = normalize(hex);
+  return [
+    parseInt(value.slice(1, 3), 16),
+    parseInt(value.slice(3, 5), 16),
+    parseInt(value.slice(5, 7), 16),
+    255,
+  ];
+}
+
+export function rgbToHex(r: number, g: number, b: number): string {
+  const hex = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return `#${hex(r)}${hex(g)}${hex(b)}`;
+}
+
 export class ColorManager {
   private foregroundColor = '#000000';
   private backgroundColor = '#ffffff';

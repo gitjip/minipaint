@@ -1,13 +1,17 @@
 import { CommandRegistry, commandList } from './commands';
 import { EventBus } from './EventBus';
 import { ViewportInteractions } from './ViewportInteractions';
-import { ColorManager } from '../core/ColorManager';
+import { ColorManager, rgbToHex } from '../core/ColorManager';
 import { Document } from '../core/Document';
 import { HistoryManager } from '../core/HistoryManager';
 import { Viewport } from '../core/Viewport';
 import { Renderer } from '../render/Renderer';
+import { BrushTool } from '../tools/BrushTool';
+import { BucketTool } from '../tools/BucketTool';
 import { EraserTool } from '../tools/EraserTool';
+import { EyedropperTool } from '../tools/EyedropperTool';
 import { PencilTool } from '../tools/PencilTool';
+import { EllipseTool, LineTool, RectTool } from '../tools/ShapeTools';
 import { ToolManager } from '../tools/ToolManager';
 import { ShortcutManager } from '../ui/ShortcutManager';
 import { UIManager } from '../ui/UIManager';
@@ -23,6 +27,11 @@ export type EditorEvents = {
 
 export interface ToolOptions {
   eraserSize: number;
+  brushSize: number;
+  brushOpacity: number;
+  shapeMode: 'stroke' | 'fill' | 'both';
+  shapeStrokeWidth: number;
+  fillTolerance: number;
 }
 
 export const DEFAULT_DOC_WIDTH = 800;
@@ -34,7 +43,14 @@ export class Editor {
   readonly registry = new CommandRegistry();
   readonly history = new HistoryManager(100);
   readonly colors = new ColorManager();
-  readonly options: ToolOptions = { eraserSize: 8 };
+  readonly options: ToolOptions = {
+    eraserSize: 8,
+    brushSize: 8,
+    brushOpacity: 1,
+    shapeMode: 'stroke',
+    shapeStrokeWidth: 2,
+    fillTolerance: 0,
+  };
   document: Document;
   readonly ui: UIManager;
   readonly renderer: Renderer;
@@ -58,7 +74,13 @@ export class Editor {
 
     this.tools = new ToolManager(this);
     this.tools.register(new PencilTool(this));
+    this.tools.register(new BrushTool(this));
     this.tools.register(new EraserTool(this));
+    this.tools.register(new BucketTool(this));
+    this.tools.register(new EyedropperTool(this));
+    this.tools.register(new LineTool(this));
+    this.tools.register(new RectTool(this));
+    this.tools.register(new EllipseTool(this));
 
     this.interactions = new ViewportInteractions(this.ui.view, this);
     this.shortcuts = new ShortcutManager(this.registry, this);
@@ -115,6 +137,16 @@ export class Editor {
 
   selectTool(id: string): boolean {
     return this.tools.select(id);
+  }
+
+  /** 取点颜色设为前景色（取色器与 Alt+点击 共用）。 */
+  pickColorAt(point: { x: number; y: number }): boolean {
+    const x = Math.round(point.x);
+    const y = Math.round(point.y);
+    const pixel = this.document.getPixel(x, y);
+    if (!pixel) return false;
+    this.colors.setForeground(rgbToHex(pixel[0], pixel[1], pixel[2]));
+    return true;
   }
 
   newDocument(width: number, height: number, background?: string): void {

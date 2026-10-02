@@ -245,6 +245,25 @@ button {
   color: var(--accent);
 }
 
+.prop-hint {
+  margin-top: 6px;
+  color: var(--text-dim);
+}
+
+.prop-hint:first-child {
+  margin-top: 0;
+}
+
+.number-input {
+  display: block;
+  width: 80px;
+  margin-top: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+}
+
 .history-list {
   display: flex;
   flex-direction: column;

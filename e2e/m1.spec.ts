@@ -100,7 +100,7 @@ test.describe('M1 · 基础绘制与历史', () => {
     await expect(page.getByTestId('status-tool')).toHaveText('铅笔');
     await expect(page.getByTestId('tool-pencil')).toHaveClass(/is-active/);
 
-    await expect(page.getByTestId('tool-bucket')).toBeDisabled();
+    await expect(page.getByTestId('tool-select')).toBeDisabled();
 
     expect(errors).toEqual([]);
   });

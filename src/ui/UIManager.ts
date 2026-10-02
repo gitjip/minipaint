@@ -15,6 +15,14 @@ const MENUS: MenuDef[] = [
 ];
 
 const ERASER_SIZES = [4, 8, 16, 32];
+const BRUSH_SIZES = [2, 4, 8, 16, 32];
+const BRUSH_OPACITIES = [100, 75, 50, 25];
+const LINE_WIDTHS = [1, 2, 4, 8];
+const SHAPE_MODES: { value: string; label: string }[] = [
+  { value: 'stroke', label: '描边' },
+  { value: 'fill', label: '填充' },
+  { value: 'both', label: '描边+填充' },
+];
 
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -295,33 +303,142 @@ export class UIManager {
     }
   }
 
+  private optionRow(
+    values: { value: string; label: string }[],
+    current: string,
+    testid: string,
+    onPick: (value: string) => void,
+  ): HTMLElement {
+    const row = el('div', 'size-options');
+    for (const item of values) {
+      const button = el('button', 'size-button', item.label);
+      button.type = 'button';
+      button.dataset.testid = `${testid}-${item.value}`;
+      if (item.value === current) button.classList.add('is-active');
+      button.addEventListener('click', () => onPick(item.value));
+      row.append(button);
+    }
+    return row;
+  }
+
+  private numberRow(
+    values: number[],
+    current: number,
+    testid: string,
+    onPick: (value: number) => void,
+  ): HTMLElement {
+    return this.optionRow(
+      values.map((value) => ({ value: String(value), label: String(value) })),
+      String(current),
+      testid,
+      (value) => onPick(Number(value)),
+    );
+  }
+
+  private optionChanged(): void {
+    this.editor.renderer.requestRender();
+  }
+
   private renderProperties(): void {
     const body = this.propertiesBody;
     body.replaceChildren();
+    const options = this.editor.options;
     const toolId = this.editor.tools?.activeToolId ?? '';
-    if (toolId === 'pencil') {
-      body.textContent = '铅笔 · 1px 硬边 · 前景色绘制';
-      return;
-    }
-    if (toolId === 'eraser') {
-      body.textContent = '橡皮 · 方形 · 擦除为背景色 · 大小:';
-      const sizes = el('div', 'size-options');
-      for (const size of ERASER_SIZES) {
-        const button = el('button', 'size-button', String(size));
-        button.type = 'button';
-        button.dataset.testid = `eraser-size-${size}`;
-        if (this.editor.options.eraserSize === size) button.classList.add('is-active');
-        button.addEventListener('click', () => {
-          this.editor.options.eraserSize = size;
-          this.renderProperties();
-          this.editor.renderer.requestRender();
-        });
-        sizes.append(button);
+
+    const label = (text: string): HTMLElement => el('div', 'prop-hint', text);
+
+    switch (toolId) {
+      case 'pencil':
+        body.textContent = '铅笔 · 1px 硬边 · 前景色绘制';
+        return;
+      case 'eraser': {
+        body.append(label('方形 · 擦除为背景色'));
+        body.append(
+          this.numberRow(ERASER_SIZES, options.eraserSize, 'eraser-size', (value) => {
+            options.eraserSize = value;
+            this.renderProperties();
+            this.optionChanged();
+          }),
+        );
+        return;
       }
-      body.append(sizes);
-      return;
+      case 'brush': {
+        body.append(label('圆形 · 前景色'));
+        body.append(
+          this.numberRow(BRUSH_SIZES, options.brushSize, 'brush-size', (value) => {
+            options.brushSize = value;
+            this.renderProperties();
+            this.optionChanged();
+          }),
+        );
+        body.append(label('不透明度'));
+        body.append(
+          this.numberRow(BRUSH_OPACITIES, Math.round(options.brushOpacity * 100), 'brush-opacity', (value) => {
+            options.brushOpacity = value / 100;
+            this.renderProperties();
+            this.optionChanged();
+          }),
+        );
+        return;
+      }
+      case 'bucket': {
+        body.append(label('填充前景色 · 容差'));
+        const input = el('input', 'number-input');
+        input.type = 'number';
+        input.min = '0';
+        input.max = '255';
+        input.value = String(options.fillTolerance);
+        input.dataset.testid = 'fill-tolerance';
+        input.addEventListener('change', () => {
+          const parsed = Number.parseInt(input.value, 10);
+          const value = Number.isFinite(parsed) ? Math.max(0, Math.min(255, parsed)) : 0;
+          options.fillTolerance = value;
+          input.value = String(value);
+        });
+        body.append(input);
+        return;
+      }
+      case 'eyedropper':
+        body.textContent = '点击拾取前景色 · 任意工具下 Alt+点击 可取色';
+        return;
+      case 'line':
+        body.append(label('线宽 · Shift 吸附 45°'));
+        body.append(
+          this.numberRow(LINE_WIDTHS, options.shapeStrokeWidth, 'line-width', (value) => {
+            options.shapeStrokeWidth = value;
+            this.renderProperties();
+            this.optionChanged();
+          }),
+        );
+        return;
+      case 'rect':
+      case 'ellipse': {
+        body.append(label(toolId === 'rect' ? 'Shift 正方形' : 'Shift 正圆'));
+        body.append(
+          this.optionRow(
+            SHAPE_MODES,
+            options.shapeMode,
+            'shape-mode',
+            (value) => {
+              options.shapeMode = value as typeof options.shapeMode;
+              this.renderProperties();
+              this.optionChanged();
+            },
+          ),
+        );
+        body.append(label('线宽'));
+        body.append(
+          this.numberRow(LINE_WIDTHS, options.shapeStrokeWidth, 'line-width', (value) => {
+            options.shapeStrokeWidth = value;
+            this.renderProperties();
+            this.optionChanged();
+          }),
+        );
+        return;
+      }
+      default:
+        body.textContent = '该工具未实现（后续里程碑）';
     }
-    body.textContent = '该工具未实现（后续里程碑）';
   }
 
   private renderHistory(): void {
