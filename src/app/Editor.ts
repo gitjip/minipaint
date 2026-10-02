@@ -4,6 +4,7 @@ import { ViewportInteractions } from './ViewportInteractions';
 import { ColorManager, rgbToHex } from '../core/ColorManager';
 import { Document } from '../core/Document';
 import { HistoryManager } from '../core/HistoryManager';
+import { SelectionManager } from '../core/SelectionManager';
 import { Viewport } from '../core/Viewport';
 import { Renderer } from '../render/Renderer';
 import { BrushTool } from '../tools/BrushTool';
@@ -12,6 +13,7 @@ import { EraserTool } from '../tools/EraserTool';
 import { EyedropperTool } from '../tools/EyedropperTool';
 import { PencilTool } from '../tools/PencilTool';
 import { EllipseTool, LineTool, RectTool } from '../tools/ShapeTools';
+import { SelectTool } from '../tools/SelectTool';
 import { ToolManager } from '../tools/ToolManager';
 import { ShortcutManager } from '../ui/ShortcutManager';
 import { UIManager } from '../ui/UIManager';
@@ -23,6 +25,7 @@ export type EditorEvents = {
   'tool:change': { id: string; label: string };
   'colors:change': Record<string, never>;
   'history:change': Record<string, never>;
+  'selection:change': Record<string, never>;
 };
 
 export interface ToolOptions {
@@ -43,6 +46,7 @@ export class Editor {
   readonly registry = new CommandRegistry();
   readonly history = new HistoryManager(100);
   readonly colors = new ColorManager();
+  readonly selection = new SelectionManager(this);
   readonly options: ToolOptions = {
     eraserSize: 8,
     brushSize: 8,
@@ -71,8 +75,10 @@ export class Editor {
       getDocument: () => this.document,
     });
     this.renderer.setPreviewPainter((ctx) => this.tools.drawPreview(ctx));
+    this.renderer.setOverlayPainter((ctx) => this.selection.paintOverlay(ctx));
 
     this.tools = new ToolManager(this);
+    this.tools.register(new SelectTool(this));
     this.tools.register(new PencilTool(this));
     this.tools.register(new BrushTool(this));
     this.tools.register(new EraserTool(this));
@@ -156,6 +162,7 @@ export class Editor {
 
   replaceDocument(doc: Document): void {
     this.document = doc;
+    this.selection.handleDocumentReplaced();
     this.history.clear();
     this.ui.updateSize();
     this.renderer.requestRender();

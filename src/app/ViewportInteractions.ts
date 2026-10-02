@@ -1,4 +1,5 @@
 import type { Editor } from './Editor';
+import { isEditableTarget } from '../ui/shortcuts';
 
 const ZOOM_BASE = 1.0015;
 
@@ -55,10 +56,14 @@ export class ViewportInteractions {
     event.preventDefault();
     const { x, y } = this.localPoint(event.clientX, event.clientY);
     const point = this.editor.viewport.screenToCanvas(x, y);
-    if (event.altKey) {
+    const selectActive = this.editor.tools.activeToolId === 'select';
+    // Alt+点击取色，但选择工具在选区内按 Alt 是复制拖拽（优先于取色）
+    if (event.altKey && !(selectActive && this.editor.selection.outlineContains(point))) {
+      this.editor.selection.commitFloat();
       this.editor.pickColorAt(point);
       return;
     }
+    if (!selectActive) this.editor.selection.commitFloat();
     this.editor.tools.pointerDown(point, event);
   };
 
@@ -122,7 +127,12 @@ export class ViewportInteractions {
 
   private onKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
-      this.editor.tools.cancel();
+      if (this.editor.tools.isStrokeActive) this.editor.tools.cancel();
+      else this.editor.selection.cancelFloat();
+      return;
+    }
+    if (event.key === 'Enter') {
+      if (!isEditableTarget(event.target)) this.editor.selection.commitFloat();
       return;
     }
     if (event.code !== 'Space' || event.repeat) return;

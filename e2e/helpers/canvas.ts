@@ -102,3 +102,37 @@ export async function waitForRender(page: Page): Promise<void> {
 export function textOf(locator: { textContent(): Promise<string | null> }): Promise<string> {
   return locator.textContent().then((text) => text ?? '');
 }
+
+/** 整幅文档像素的 FNV-1a 哈希，用于「逐像素还原」断言。 */
+export async function docHash(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const editor = (window as unknown as { minipaint: Editor }).minipaint;
+    const doc = editor.document;
+    const image = doc.ctx.getImageData(0, 0, doc.width, doc.height);
+    let hash = 2166136261;
+    for (let i = 0; i < image.data.length; i++) {
+      hash ^= image.data[i];
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16);
+  });
+}
+
+export interface SelectionSnapshot {
+  shape: { x: number; y: number; width: number; height: number } | null;
+  float: { x: number; y: number; width: number; height: number } | null;
+}
+
+/** 当前选区与浮离状态（仅取可序列化字段）。 */
+export async function selectionState(page: Page): Promise<SelectionSnapshot> {
+  return page.evaluate(() => {
+    const editor = (window as unknown as { minipaint: Editor }).minipaint;
+    const { shape, float } = editor.selection;
+    return {
+      shape: shape ? { x: shape.x, y: shape.y, width: shape.width, height: shape.height } : null,
+      float: float
+        ? { x: float.x, y: float.y, width: float.canvas.width, height: float.canvas.height }
+        : null,
+    };
+  });
+}

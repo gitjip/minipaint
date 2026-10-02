@@ -20,6 +20,7 @@ export class Renderer {
   private rafId = 0;
   private dpr = 1;
   private previewPainter: ((ctx: CanvasRenderingContext2D) => void) | null = null;
+  private overlayPainter: ((ctx: CanvasRenderingContext2D) => void) | null = null;
 
   constructor(options: RendererOptions) {
     this.view = options.view;
@@ -32,6 +33,10 @@ export class Renderer {
 
   setPreviewPainter(painter: (ctx: CanvasRenderingContext2D) => void): void {
     this.previewPainter = painter;
+  }
+
+  setOverlayPainter(painter: (ctx: CanvasRenderingContext2D) => void): void {
+    this.overlayPainter = painter;
   }
 
   resize(): void {
@@ -116,6 +121,14 @@ export class Renderer {
       previewCtx.setTransform(scale * dpr, 0, 0, scale * dpr, offsetX * dpr, offsetY * dpr);
       this.previewPainter(previewCtx);
       previewCtx.restore();
+    }
+
+    const overlayCtx = this.overlayLayer.getContext('2d');
+    if (overlayCtx && this.overlayPainter) {
+      overlayCtx.save();
+      overlayCtx.setTransform(scale * dpr, 0, 0, scale * dpr, offsetX * dpr, offsetY * dpr);
+      this.overlayPainter(overlayCtx);
+      overlayCtx.restore();
     }
   }
 

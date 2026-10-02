@@ -99,7 +99,7 @@ playwright.config.ts      固定 viewport / deviceScaleFactor=1 / webServer 自�
 | M0 脚手架与画布 | ✅ 已完成 | e2e/m0.spec.ts |
 | M1 基础绘制与历史 | ✅ 已完成 | e2e/m1.spec.ts |
 | M2 形状、填充与取色 | ✅ 已完成 | e2e/m2.spec.ts |
-| M3 选区与剪贴板 | ⬜ 未开始 | e2e/m3.spec.ts |
+| M3 选区与剪贴板 | 🟡 进行中（M3a 已完成，待 M3b 套索与裁剪） | e2e/m3.spec.ts |
 | M4 文本与文件 | ⬜ 未开始 | e2e/m4.spec.ts |
 | M5 打磨与完备 | ⬜ 未开始 | e2e/m5.spec.ts |
 | M6 可选扩展 | ⏸ 暂缓 | — |
@@ -151,14 +151,15 @@ E2E 验收（e2e/m2.spec.ts）：
 
 ### M3 · 选区与剪贴板（3–5 次会话，最难）
 任务：
-- [ ] 矩形选择、套索，蚂蚁线（测试可关闭动画）
-- [ ] 选区内移动、剪切 / 复制 / 粘贴（Clipboard API + 内部缓冲降级）
-- [ ] `Delete`、`Ctrl+A`，`Ctrl` 拖拽移动、`Alt` 复制拖拽
+- [x] 矩形选框、蚂蚁线（`prefers-reduced-motion` 关闭动画）
+- [ ] 套索选择
+- [x] 选区内移动、剪切 / 复制 / 粘贴（Clipboard API + 内部缓冲降级）
+- [x] `Delete`、`Ctrl+A`，普通/Ctrl 拖拽移动、`Alt` 复制拖拽（浮离 Enter/点外落定、Esc 取消）
 - [ ] 裁剪工具：裁剪到选区
 
 E2E 验收（e2e/m3.spec.ts）：
-- [ ] 选区 → 复制 → 粘贴 → 移动 → Delete → 连续撤销链逐像素还原
-- [ ] 粘贴内容先浮离，落定后才入历史
+- [x] 选区 → 复制 → 粘贴 → 移动 → Delete → 连续撤销链逐像素还原
+- [x] 粘贴内容先浮离，落定后才入历史
 - [ ] 裁剪后文档尺寸、状态栏、视口居中三者一致
 - [ ] 单测：套索命中测试、路径包含判定
 

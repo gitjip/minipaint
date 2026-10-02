@@ -57,6 +57,47 @@ export const commandList: Command[] = [
     },
   },
   {
+    id: 'edit.selectAll',
+    label: '全选',
+    shortcuts: ['Mod+A'],
+    run: (editor) => editor.selection.selectAll(),
+  },
+  {
+    id: 'edit.cut',
+    label: '剪切',
+    shortcuts: ['Mod+X'],
+    enabled: (editor) => editor.selection.hasSelection,
+    run: (editor) => {
+      editor.selection.cutSelection();
+    },
+  },
+  {
+    id: 'edit.copy',
+    label: '复制',
+    shortcuts: ['Mod+C'],
+    enabled: (editor) => editor.selection.hasSelection,
+    run: (editor) => {
+      editor.selection.copySelection();
+    },
+  },
+  {
+    id: 'edit.paste',
+    label: '粘贴',
+    shortcuts: ['Mod+V'],
+    run: (editor) => {
+      void editor.selection.pasteClipboard();
+    },
+  },
+  {
+    id: 'edit.delete',
+    label: '删除',
+    shortcuts: ['Delete', 'Backspace'],
+    enabled: (editor) => editor.selection.hasSelection,
+    run: (editor) => {
+      editor.selection.deleteSelection();
+    },
+  },
+  {
     id: 'view.zoomIn',
     label: '放大',
     shortcuts: ['Mod+='],
@@ -75,7 +116,12 @@ export const commandList: Command[] = [
     run: (editor) => editor.fitToWindow(),
   },
   { id: 'help.about', label: '关于 MiniPaint', run: (editor) => editor.showAbout() },
-  { id: 'tool.select', label: '选择', shortcuts: ['M'] },
+  {
+    id: 'tool.select',
+    label: '选择',
+    shortcuts: ['M'],
+    run: (editor) => editor.selectTool('select'),
+  },
   { id: 'tool.crop', label: '裁剪', shortcuts: ['C'] },
   {
     id: 'tool.pencil',

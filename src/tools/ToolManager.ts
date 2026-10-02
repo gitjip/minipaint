@@ -29,6 +29,7 @@ export class ToolManager {
     const tool = this.tools.get(id);
     if (!tool) return false;
     if (this.strokeActive) this.cancel();
+    if (this.active !== tool) this.editor.selection.commitFloat();
     if (this.active === tool) return true;
     this.active = tool;
     this.editor.events.emit('tool:change', { id: tool.id, label: tool.label });

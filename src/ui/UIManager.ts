@@ -9,7 +9,18 @@ interface MenuDef {
 
 const MENUS: MenuDef[] = [
   { label: '文件', items: ['file.new', 'file.open', 'file.save', 'file.exportPng'] },
-  { label: '编辑', items: ['edit.undo', 'edit.redo'] },
+  {
+    label: '编辑',
+    items: [
+      'edit.undo',
+      'edit.redo',
+      'edit.selectAll',
+      'edit.cut',
+      'edit.copy',
+      'edit.paste',
+      'edit.delete',
+    ],
+  },
   { label: '查看', items: ['view.zoomIn', 'view.zoomOut', 'view.fit'] },
   { label: '帮助', items: ['help.about'] },
 ];
@@ -175,6 +186,11 @@ export class UIManager {
       this.renderProperties();
     });
     editor.events.on('colors:change', () => this.syncColors());
+    editor.events.on('selection:change', () => {
+      this.refreshMenuStates();
+      const id = this.editor.tools.activeToolId;
+      if (id === 'select' || id === 'crop') this.renderProperties();
+    });
     editor.history.subscribe(() => {
       this.refreshMenuStates();
       this.renderHistory();
@@ -401,6 +417,13 @@ export class UIManager {
       case 'eyedropper':
         body.textContent = '点击拾取前景色 · 任意工具下 Alt+点击 可取色';
         return;
+      case 'select': {
+        const outline = this.editor.selection.outlineRect();
+        body.textContent = outline
+          ? `选区 ${outline.width}×${outline.height} · 拖选区内移动 · Alt 复制 · Enter 落定 · Esc 取消`
+          : '矩形选框 · 拖拽建立 · 点击空白取消';
+        return;
+      }
       case 'line':
         body.append(label('线宽 · Shift 吸附 45°'));
         body.append(

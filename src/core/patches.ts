@@ -44,6 +44,43 @@ export function unionRect(a: Rect | null, b: Rect): Rect {
   return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }
 
+export interface PointLike {
+  x: number;
+  y: number;
+}
+
+/** 命中测试：含右/下边界（便于抓住选区边线拖动）。 */
+export function pointInRect(rect: Rect, point: PointLike): boolean {
+  return (
+    point.x >= rect.x &&
+    point.y >= rect.y &&
+    point.x <= rect.x + rect.width &&
+    point.y <= rect.y + rect.height
+  );
+}
+
+/** 拖拽产生的矩形：两端取整并夹紧到 [0, maxWidth/Height]，宽高非负。 */
+export function normalizeDragRect(a: PointLike, b: PointLike, maxWidth: number, maxHeight: number): Rect {
+  const ax = Math.round(a.x);
+  const bx = Math.round(b.x);
+  const ay = Math.round(a.y);
+  const by = Math.round(b.y);
+  const x0 = Math.max(0, Math.min(ax, bx));
+  const y0 = Math.max(0, Math.min(ay, by));
+  const x1 = Math.min(maxWidth, Math.max(ax, bx));
+  const y1 = Math.min(maxHeight, Math.max(ay, by));
+  return { x: x0, y: y0, width: Math.max(0, x1 - x0), height: Math.max(0, y1 - y0) };
+}
+
+export function imagesEqual(a: RawImageData, b: RawImageData): boolean {
+  if (a.width !== b.width || a.height !== b.height) return false;
+  if (a.data.length !== b.data.length) return false;
+  for (let i = 0; i < a.data.length; i++) {
+    if (a.data[i] !== b.data[i]) return false;
+  }
+  return true;
+}
+
 class PatchEntry implements HistoryEntry {
   constructor(
     private readonly target: PatchTarget,
