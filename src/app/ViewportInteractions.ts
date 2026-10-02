@@ -128,11 +128,17 @@ export class ViewportInteractions {
   private onKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
       if (this.editor.tools.isStrokeActive) this.editor.tools.cancel();
-      else this.editor.selection.cancelFloat();
+      else if (this.editor.selection.hasFloat) this.editor.selection.cancelFloat();
+      else if (this.editor.tools.activeToolId === 'crop') this.editor.selection.setShape(null);
       return;
     }
     if (event.key === 'Enter') {
-      if (!isEditableTarget(event.target)) this.editor.selection.commitFloat();
+      if (isEditableTarget(event.target)) return;
+      if (this.editor.tools.activeToolId === 'crop') {
+        if (!this.editor.tools.isStrokeActive) this.editor.cropSelection();
+      } else {
+        this.editor.selection.commitFloat();
+      }
       return;
     }
     if (event.code !== 'Space' || event.repeat) return;

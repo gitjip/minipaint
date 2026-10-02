@@ -7,6 +7,7 @@ import {
   type Patch,
   type Rect,
 } from './patches';
+import { pointInPolygon, polygonBounds, translatePoints, type PointLike } from './selectionPath';
 
 export interface FloatState {
   canvas: HTMLCanvasElement;
@@ -14,6 +15,8 @@ export interface FloatState {
   y: number;
   /** 取消浮离时要恢复的原选区（粘贴为 null）。 */
   origShape: Rect | null;
+  /** 取消浮离时要恢复的原套索路径（矩形选区/粘贴为 null）。 */
+  origLasso: PointLike[] | null;
   /** 挖洞补丁（移动时产生；复制/粘贴为 null）。 */
   pendingPatch: Patch | null;
   name: string;
@@ -22,13 +25,16 @@ export interface FloatState {
 /**
  * 选区与浮离内容的状态机。
  *
- * - shape：已确定的选区（矩形，始终夹紧在文档内）。
+ * - shape：已确定的选区包围盒（始终夹紧在文档内）。
+ * - lasso：套索路径（文档坐标，可超出文档）；null 表示矩形选区。
+ *   所有按选区裁剪的操作（移动/复制/删除）以路径为蒙版，包围盒外的路径内像素不受影响。
  * - float：浮离层（粘贴 / 拖动移动中），落定（commit）才写入历史，
  *   取消（cancel）恢复文档到浮离前状态。
  * - 系统剪贴板为首选读写路径，失败降级到内部缓冲。
  */
 export class SelectionManager {
   shape: Rect | null = null;
+  lasso: PointLike[] | null = null;
   float: FloatState | null = null;
   private internal: HTMLCanvasElement | null = null;
   private antPhase = 0;
@@ -77,13 +83,33 @@ export class SelectionManager {
   setShape(rect: Rect | null): void {
     this.commitFloat();
     this.shape = rect;
+    this.lasso = null;
     this.emit();
+  }
+
+  /** 套索选区：shape 为夹紧后的包围盒，lasso 为原始路径。点数/范围不足则清空选区。 */
+  setLassoSelection(points: readonly PointLike[]): boolean {
+    this.commitFloat();
+    const bounds = polygonBounds(points);
+    const doc = this.editor.document;
+    const rect = bounds ? clampRect(bounds, doc.width, doc.height) : null;
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      this.shape = null;
+      this.lasso = null;
+      this.emit();
+      return false;
+    }
+    this.shape = rect;
+    this.lasso = translatePoints(points, 0, 0);
+    this.emit();
+    return true;
   }
 
   selectAll(): void {
     this.commitFloat();
     const doc = this.editor.document;
     this.shape = { x: 0, y: 0, width: doc.width, height: doc.height };
+    this.lasso = null;
     this.emit();
   }
 
@@ -100,38 +126,60 @@ export class SelectionManager {
     return this.shape;
   }
 
-  outlineContains(point: { x: number; y: number }): boolean {
-    const outline = this.outlineRect();
-    return outline ? pointInRect(outline, point) : false;
+  outlineContains(point: PointLike): boolean {
+    if (this.float) {
+      const outline = this.outlineRect();
+      return outline ? pointInRect(outline, point) : false;
+    }
+    if (this.lasso && this.shape) return pointInPolygon(this.lasso, point);
+    return this.shape ? pointInRect(this.shape, point) : false;
   }
 
   setFloatPosition(x: number, y: number): void {
     if (!this.float || (this.float.x === x && this.float.y === y)) return;
+    const dx = x - this.float.x;
+    const dy = y - this.float.y;
     this.float.x = x;
     this.float.y = y;
+    if (this.lasso && (dx !== 0 || dy !== 0)) this.lasso = translatePoints(this.lasso, dx, dy);
     this.emit();
   }
 
   /**
    * 从当前选区建立浮离层。
    * duplicate=true（Alt）：复制内容，原文档不动；false：挖洞移动，洞立即填背景色。
+   * 套索选区按路径蒙版：浮离画布仅保留路径内像素，洞也只挖路径内区域。
    */
   startFloatGesture(duplicate: boolean): boolean {
     if (this.float || !this.shape) return false;
     const doc = this.editor.document;
     const rect = this.shape;
+    const mask = this.lasso;
     const canvas = document.createElement('canvas');
     canvas.width = rect.width;
     canvas.height = rect.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return false;
     ctx.drawImage(doc.canvas, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
+    if (mask) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-in';
+      this.tracePath(ctx, mask, -rect.x, -rect.y);
+      ctx.fill(); // destination-in 只在真正上色时生效，漏掉会整块包围盒进浮离
+      ctx.restore();
+    }
 
     let pendingPatch: Patch | null = null;
     if (!duplicate) {
       const before = doc.readRect(rect);
+      doc.ctx.save();
+      if (mask) {
+        this.tracePath(doc.ctx, mask, 0, 0);
+        doc.ctx.clip();
+      }
       doc.ctx.fillStyle = this.editor.colors.background;
       doc.ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+      doc.ctx.restore();
       const after = doc.readRect(rect);
       pendingPatch = { rect: { ...rect }, before, after };
     }
@@ -140,6 +188,7 @@ export class SelectionManager {
       x: rect.x,
       y: rect.y,
       origShape: { ...rect },
+      origLasso: mask ? translatePoints(mask, 0, 0) : null,
       pendingPatch,
       name: duplicate ? '复制选区' : '移动选区',
     };
@@ -167,10 +216,12 @@ export class SelectionManager {
       x,
       y,
       origShape: null,
+      origLasso: null,
       pendingPatch: null,
       name: '粘贴',
     };
     this.shape = { x, y, width: canvas.width, height: canvas.height };
+    this.lasso = null;
     this.emit();
   }
 
@@ -182,6 +233,7 @@ export class SelectionManager {
     }
     this.float = null;
     this.shape = f.origShape;
+    this.lasso = f.origLasso;
     this.emit();
     return true;
   }
@@ -210,6 +262,7 @@ export class SelectionManager {
 
     this.float = null;
     this.shape = committed;
+    if (!committed) this.lasso = null;
     if (patches.length > 0) {
       this.editor.history.push(createPatchEntry(doc, f.name, patches));
     }
@@ -224,8 +277,14 @@ export class SelectionManager {
     const rect = clampRect(this.shape, doc.width, doc.height);
     if (rect.width <= 0 || rect.height <= 0) return false;
     const before = doc.readRect(rect);
+    doc.ctx.save();
+    if (this.lasso) {
+      this.tracePath(doc.ctx, this.lasso, 0, 0);
+      doc.ctx.clip();
+    }
     doc.ctx.fillStyle = this.editor.colors.background;
     doc.ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    doc.ctx.restore();
     const after = doc.readRect(rect);
     if (imagesEqual(before, after)) return false;
     this.editor.history.push(createPatchEntry(doc, name, [{ rect, before, after }]));
@@ -249,6 +308,13 @@ export class SelectionManager {
       rect.width,
       rect.height,
     );
+    if (this.lasso) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-in';
+      this.tracePath(ctx, this.lasso, -rect.x, -rect.y);
+      ctx.fill(); // 同上：复制/剪切的蒙版必须真正 fill 才生效
+      ctx.restore();
+    }
     return canvas;
   }
 
@@ -332,23 +398,50 @@ export class SelectionManager {
     }
     const outline = this.outlineRect();
     if (!outline || outline.width <= 0 || outline.height <= 0) return;
+    const lasso = this.lasso;
     const lw = 1 / scale;
     ctx.save();
     ctx.lineWidth = lw;
     ctx.setLineDash([4 / scale, 4 / scale]);
+    const strokeOutline = (): void => {
+      if (lasso) {
+        this.tracePath(ctx, lasso, 0, 0, true);
+        ctx.stroke(); // 只描点不上色则蚂蚁线不可见
+      } else {
+        ctx.strokeRect(outline.x, outline.y, outline.width, outline.height);
+      }
+    };
     ctx.strokeStyle = '#000000';
     ctx.lineDashOffset = this.antPhase / scale;
-    ctx.strokeRect(outline.x, outline.y, outline.width, outline.height);
+    strokeOutline();
     ctx.strokeStyle = '#ffffff';
     ctx.lineDashOffset = (this.antPhase + 4) / scale;
-    ctx.strokeRect(outline.x, outline.y, outline.width, outline.height);
+    strokeOutline();
     ctx.restore();
+  }
+
+  /** 描出选区路径（文档坐标 + 偏移；close 时闭合到首点）。 */
+  private tracePath(
+    ctx: CanvasRenderingContext2D,
+    points: readonly PointLike[],
+    offsetX: number,
+    offsetY: number,
+    close = false,
+  ): void {
+    if (points.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x + offsetX, points[0].y + offsetY);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x + offsetX, points[i].y + offsetY);
+    }
+    if (close) ctx.closePath();
   }
 
   /** 文档被替换（新建/打开/裁剪）时静默清空状态。 */
   handleDocumentReplaced(): void {
     this.float = null;
     this.shape = null;
+    this.lasso = null;
     this.syncAnts();
     this.editor.events.emit('selection:change', {});
   }

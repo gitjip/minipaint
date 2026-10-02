@@ -122,7 +122,7 @@ export const commandList: Command[] = [
     shortcuts: ['M'],
     run: (editor) => editor.selectTool('select'),
   },
-  { id: 'tool.crop', label: '裁剪', shortcuts: ['C'] },
+  { id: 'tool.crop', label: '裁剪', shortcuts: ['C'], run: (editor) => editor.selectTool('crop') },
   {
     id: 'tool.pencil',
     label: '铅笔',

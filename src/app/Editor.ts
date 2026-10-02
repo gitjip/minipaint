@@ -5,10 +5,12 @@ import { ColorManager, rgbToHex } from '../core/ColorManager';
 import { Document } from '../core/Document';
 import { HistoryManager } from '../core/HistoryManager';
 import { SelectionManager } from '../core/SelectionManager';
+import { clampRect, type Rect } from '../core/patches';
 import { Viewport } from '../core/Viewport';
 import { Renderer } from '../render/Renderer';
 import { BrushTool } from '../tools/BrushTool';
 import { BucketTool } from '../tools/BucketTool';
+import { CropTool } from '../tools/CropTool';
 import { EraserTool } from '../tools/EraserTool';
 import { EyedropperTool } from '../tools/EyedropperTool';
 import { PencilTool } from '../tools/PencilTool';
@@ -35,6 +37,7 @@ export interface ToolOptions {
   shapeMode: 'stroke' | 'fill' | 'both';
   shapeStrokeWidth: number;
   fillTolerance: number;
+  selectionMode: 'rect' | 'lasso';
 }
 
 export const DEFAULT_DOC_WIDTH = 800;
@@ -54,6 +57,7 @@ export class Editor {
     shapeMode: 'stroke',
     shapeStrokeWidth: 2,
     fillTolerance: 0,
+    selectionMode: 'rect',
   };
   document: Document;
   readonly ui: UIManager;
@@ -79,6 +83,7 @@ export class Editor {
 
     this.tools = new ToolManager(this);
     this.tools.register(new SelectTool(this));
+    this.tools.register(new CropTool(this));
     this.tools.register(new PencilTool(this));
     this.tools.register(new BrushTool(this));
     this.tools.register(new EraserTool(this));
@@ -167,6 +172,26 @@ export class Editor {
     this.ui.updateSize();
     this.renderer.requestRender();
     this.events.emit('document:change', { document: doc });
+  }
+
+  /** 裁剪到给定区域：替换文档（清历史）并把视口重新居中。 */
+  cropTo(rect: Rect | null): boolean {
+    if (!rect) return false;
+    const clamped = clampRect(rect, this.document.width, this.document.height);
+    if (clamped.width <= 0 || clamped.height <= 0) return false;
+    if (clamped.width === this.document.width && clamped.height === this.document.height) {
+      return false;
+    }
+    const next = new Document(clamped.width, clamped.height);
+    next.ctx.drawImage(this.document.canvas, -clamped.x, -clamped.y);
+    this.replaceDocument(next);
+    this.resetView();
+    return true;
+  }
+
+  /** 裁剪到当前选区（裁剪工具 Enter / 点击框内确认）。 */
+  cropSelection(): boolean {
+    return this.cropTo(this.selection.shape);
   }
 
   setHover(point: { x: number; y: number } | null): void {

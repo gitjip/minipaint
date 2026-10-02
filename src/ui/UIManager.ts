@@ -418,12 +418,45 @@ export class UIManager {
         body.textContent = '点击拾取前景色 · 任意工具下 Alt+点击 可取色';
         return;
       case 'select': {
+        body.append(label('选区模式'));
+        body.append(
+          this.optionRow(
+            [
+              { value: 'rect', label: '矩形' },
+              { value: 'lasso', label: '套索' },
+            ],
+            options.selectionMode,
+            'select-mode',
+            (value) => {
+              options.selectionMode = value as typeof options.selectionMode;
+              this.renderProperties();
+              this.optionChanged();
+            },
+          ),
+        );
         const outline = this.editor.selection.outlineRect();
-        body.textContent = outline
-          ? `选区 ${outline.width}×${outline.height} · 拖选区内移动 · Alt 复制 · Enter 落定 · Esc 取消`
-          : '矩形选框 · 拖拽建立 · 点击空白取消';
+        if (options.selectionMode === 'lasso') {
+          body.append(
+            label(
+              outline
+                ? `套索选区 ${outline.width}×${outline.height} · 拖路径内移动 · Alt 复制 · Enter 落定`
+                : '套索 · 沿目标拖出闭合路径，松手成形 · 点击空白取消',
+            ),
+          );
+        } else {
+          body.append(
+            label(
+              outline
+                ? `选区 ${outline.width}×${outline.height} · 拖选区内移动 · Alt 复制 · Enter 落定 · Esc 取消`
+                : '矩形选框 · 拖拽建立 · 点击空白取消',
+            ),
+          );
+        }
         return;
       }
+      case 'crop':
+        body.append(label('拖拽框选 → Enter / 点击框内应用 · Esc 取消'));
+        return;
       case 'line':
         body.append(label('线宽 · Shift 吸附 45°'));
         body.append(

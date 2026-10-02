@@ -6,9 +6,9 @@ import { BaseTool } from './Tool';
 type Mode = 'idle' | 'creating' | 'dragging';
 
 /**
- * 矩形选框工具（M3a；套索在 M3b 加入）。
+ * 选择工具（M3a 矩形 + M3b 套索）。
  *
- * - 选区外按下拖拽 → 建立新选区（起点在浮离外则先落定浮离）。
+ * - 选区外按下拖拽 → 建立新选区（矩形或按当前模式圈套索路径）。
  * - 选区内按下拖拽 → 移动浮离（Alt=复制原文；普通/Ctrl=挖洞移动）。
  * - 浮离存在时按下浮离外 → 落定浮离并吞掉本次手势。
  * - Esc → 取消进行中的手势（含刚挖洞的浮离）。
@@ -23,6 +23,8 @@ export class SelectTool extends BaseTool {
   private floatStart: { x: number; y: number } | null = null;
   private liftedThisGesture = false;
   private moved = false;
+  private lassoMode = false;
+  private lassoPoints: Point[] = [];
 
   constructor(editor: Editor) {
     super();
@@ -62,12 +64,19 @@ export class SelectTool extends BaseTool {
     this.origin = point;
     this.liftedThisGesture = false;
     this.moved = false;
+    this.lassoMode = this.editor.options.selectionMode === 'lasso';
+    this.lassoPoints = this.lassoMode ? [point] : [];
     if (selection.hasSelection) selection.setShape(null);
   }
 
   onPointerMove(point: Point, _event: PointerEvent): void {
     const selection = this.editor.selection;
     if (this.mode === 'creating' && this.origin) {
+      if (this.lassoMode) {
+        this.lassoPoints.push(point);
+        if (this.lassoPoints.length >= 3) selection.setLassoSelection(this.lassoPoints);
+        return;
+      }
       const doc = this.editor.document;
       const rect = normalizeDragRect(this.origin, point, doc.width, doc.height);
       selection.setShape(rect.width > 0 && rect.height > 0 ? rect : null);
@@ -84,6 +93,16 @@ export class SelectTool extends BaseTool {
   }
 
   onPointerUp(point: Point, event: PointerEvent): void {
+    if (this.mode === 'creating' && this.lassoMode) {
+      this.lassoPoints.push(point);
+      if (this.lassoPoints.length >= 3) {
+        this.editor.selection.setLassoSelection(this.lassoPoints);
+      } else if (this.editor.selection.hasSelection) {
+        this.editor.selection.setShape(null);
+      }
+      this.reset();
+      return;
+    }
     this.onPointerMove(point, event);
     if (this.mode === 'dragging' && this.liftedThisGesture && !this.moved) {
       // 仅按下未拖动：撤销挖洞/复制，不留下空浮离
@@ -107,6 +126,8 @@ export class SelectTool extends BaseTool {
     this.floatStart = null;
     this.liftedThisGesture = false;
     this.moved = false;
+    this.lassoMode = false;
+    this.lassoPoints = [];
   }
 
   drawPreview(_ctx: CanvasRenderingContext2D): void {}

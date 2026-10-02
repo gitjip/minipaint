@@ -123,6 +123,19 @@ export interface SelectionSnapshot {
   float: { x: number; y: number; width: number; height: number } | null;
 }
 
+/** 覆盖层上有内容的像素数（蚂蚁线/浮离可见性断言）。 */
+export async function overlayPixelCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const editor = (window as unknown as { minipaint: Editor }).minipaint;
+    const overlay = editor.ui.overlayLayer;
+    const ctx = overlay.getContext('2d')!;
+    const data = ctx.getImageData(0, 0, overlay.width, overlay.height).data;
+    let count = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i] > 0) count++;
+    return count;
+  });
+}
+
 /** 当前选区与浮离状态（仅取可序列化字段）。 */
 export async function selectionState(page: Page): Promise<SelectionSnapshot> {
   return page.evaluate(() => {
